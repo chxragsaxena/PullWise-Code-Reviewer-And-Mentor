@@ -1,0 +1,30 @@
+.prose {
+  max-width: 44rem;
+}
+.prose h1 {
+  font-size: var(--text-xl);
+}
+.prose h2 {
+  margin-top: var(--space-5);
+  font-size: var(--text-lg);
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-5);
+}
+.prose pre {
+  overflow-x: auto;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+}
+.prose pre code {
+  padding: 0;
+  background: none;
+}
+.prose > :last-child {
+  margin-bottom: 0;
+}

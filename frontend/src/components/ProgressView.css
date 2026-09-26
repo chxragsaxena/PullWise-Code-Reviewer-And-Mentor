@@ -1,0 +1,40 @@
+.progress {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.progress__now {
+  color: var(--text-muted);
+}
+.progress__error {
+  padding: var(--space-3);
+  border: 1px solid var(--sev-critical-border);
+  border-radius: var(--radius);
+  background: var(--sev-critical-bg);
+  color: var(--sev-critical-fg);
+}
+
+.progress__log summary {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.progress__log ul {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.progress__log li {
+  display: flex;
+  gap: var(--space-3);
+}
+.progress__log time {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}

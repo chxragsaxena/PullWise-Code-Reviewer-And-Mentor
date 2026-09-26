@@ -1,0 +1,56 @@
+.finding-groups {
+  display: grid;
+  gap: var(--space-5);
+}
+.finding-groups__heading {
+  margin-bottom: var(--space-3);
+}
+
+.finding-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finding-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.finding-card:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.finding-card__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.finding-card__skill {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.finding-card__title {
+  margin-top: var(--space-1);
+  font-weight: 600;
+}
+.finding-card__found {
+  color: var(--text-muted);
+}
+.finding-card__location {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+}

@@ -1,0 +1,26 @@
+.pr-summary {
+  margin-bottom: var(--space-5);
+}
+.pr-summary__repo {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+}
+.pr-summary__title {
+  margin-bottom: var(--space-2);
+}
+.pr-summary__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.pr-summary__add {
+  color: var(--ok-fg);
+  font-weight: 600;
+}
+.pr-summary__del {
+  color: var(--sev-critical-fg);
+  font-weight: 600;
+}

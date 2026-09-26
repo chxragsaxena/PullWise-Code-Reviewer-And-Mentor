@@ -32,6 +32,13 @@ findings must carry evidence, not LLM opinion.
 Code = review engine. YAML = what to check. Markdown = what to teach.
 PostgreSQL = what happened. Claude = contextual reasoning (only `kind: ai` checks).
 
+## Frontend decisions (confirmed by user)
+- Plain CSS with design tokens (no Tailwind); light + dark following the system, plus a manual toggle.
+- Data source: typed API client with a **mock implementation** for now; switch to the real Go API by config. Contract lives in `docs/api.md` (proposed, pending user approval; backend must follow it).
+- V1 screens (all four): Home (PR URL form + recent reviews), Review progress, Results dashboard (summary, severity/skill filters, findings), Finding detail (evidence, explanation, improvement, Markdown lesson).
+- React Router; plain typed `fetch`; no state-management or data-fetching library; **SSE for progress from the start (no polling)**; Vitest + React Testing Library; a list-reviews endpoint for recent reviews; Node 24 + npm.
+- UI must stay componentized so mock -> real API needs no UI changes (API client injected via React context).
+
 ## Out of scope (do not build unless asked)
 Private repos, GitHub App/webhooks, Redis, NATS, repo RAG, auto-fix/rewrite,
 custom team skills, >2 languages, agentic architecture, microservices, IDE features.
@@ -52,7 +59,10 @@ Status: `[x]` done, `[~]` written but unverified, `[ ]` not started
 - [~] Go skill: `skills/go/skill.yaml` + 4 lessons (error-handling, context, concurrency, interfaces)
 - [~] `docs/architecture.md`
 - [x] Git repo created and pushed to GitHub (initial commit b344776); `.gitignore` and README added
-- [~] Install toolchain (see Environment): Go, Node, Git, WSL done; Docker engine not yet running
+- [x] Install toolchain (see Environment): Go, Node, Git, WSL, Docker engine all working (Semgrep to run as a container later)
+- [x] `docs/api.md`: API contract v1 (proposed, pending user approval; backend must implement it)
+- [x] Frontend (React + TS + Vite) built against a mock API: Home, Review progress (SSE-style stream), Results dashboard, Finding detail with Markdown lesson; light/dark theme. `npm run typecheck`, `npm test` (47 tests), `npm run build` all pass. Not yet visually reviewed in a browser by Claude (no browser access); user should run `npm run dev` in `frontend/` and review.
+- [ ] Frontend: switch to real backend (`VITE_API_MODE=http`) once the Go endpoints exist; verify SSE against the real server
 - [ ] `docker-compose.yml` (Postgres with named volume, password from `.env`, migrations applied) + `.env.example`; run migration
 - [x] `backend/go.mod` (module `github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor`, matches the GitHub repo, confirmed by user); layout `backend/`, `frontend/` per user
 - [~] Interfaces: `StaticAnalyzer` done in `internal/review`; `LLMProvider` not yet
@@ -74,12 +84,13 @@ Machine: Windows 11 Home, PowerShell. Workspace: `C:\Users\jyoti\OneDrive\Deskto
 Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (branch `main`, remote `origin`; local git identity chxragsaxena / chiragsaxena79@gmail.com). GitHub login is saved via Git Credential Manager. The push must be run by the user from a terminal (Claude's shell cannot show login prompts, but plain `git push` should work now that credentials are saved).
 As of 2026-09-26:
 - **Installed:** Go 1.27.1, Node 24.21.0 / npm 11.19.0, Git 2.55.0, WSL 2.7.14 (no Ubuntu; Docker backend only, user wants to work on Windows).
-- **Docker Desktop 29.8.0** installed; the engine was still failing with "unable to start" at last check. Needed for Postgres (and later Semgrep as a container).
+- **Docker Desktop 29.8.0: engine running** (client/server 29.8.0, `docker-desktop` WSL2 distro running). It had been stuck because the backend process started before WSL was installed and never rechecked; fixed by fully killing Docker Desktop + `com.docker.backend` and relaunching. If it hangs again on "Starting the Docker Engine", check `%LOCALAPPDATA%\Docker\log\host\com.docker.backend.exe.log` for the first `[E]` line.
 - **Decision:** database runs in Docker (`postgres:18`), not a native install. The user manually removed the broken native PostgreSQL install.
 - **Not installed:** Semgrep, Python (Semgrep will run as a container instead).
 - Terminals/sessions opened before an install don't see new PATH entries; open a fresh one.
 
 ## Open questions
+- API contract (`docs/api.md`) needs the user's approval before the backend implements it.
 - DB password: user wants to choose their own (not `dev`); keep it in a git-ignored `.env`, read by compose and the Go server via `DATABASE_URL`.
 - Claude model/pricing choice for the AI pass (decide when we reach it; use claude-api skill)
 
@@ -93,7 +104,7 @@ As of 2026-09-26:
 - Keep code clean, good quality: layered (handler -> service -> repository), small interfaces, errors wrapped with context, `ctx` first, table-driven tests, `gofmt` + `go vet` + `go test ./...` must pass before calling work done.
 - Goal right now: a working fullstack app with correct REST APIs and a React frontend.
 - **If in doubt about a spec/decision, stop and ask the user. Do not invent the spec.**
-- Run Go commands from `backend/`. Two top-level folders: `backend/` and `frontend/`.
+- Run Go commands from `backend/` and npm commands from `frontend/`. Two top-level folders: `backend/` and `frontend/`. (The shell's working directory persists between commands: always `Set-Location` explicitly or npm/go will run in the wrong folder. This already caused one stray `node_modules` in `backend/`, since cleaned.)
 
 ## Repo layout (current)
 ```
@@ -108,7 +119,13 @@ backend/internal/httpapi/    router, middleware, JSON/error helpers
 backend/cmd/server/          entrypoint (run from backend/: go run ./cmd/server)
 backend/migrations/0001_init.sql
 backend/skills/go/           skill.yaml + lessons/*.md
-frontend/                    empty (React + TS + Vite to come)
+frontend/                    React + TS + Vite app (run from frontend/: npm run dev | test | build)
+frontend/src/api/            ApiClient interface, mock + http clients, ApiProvider (context)
+frontend/src/lib/            pure logic: prUrl parsing, findings filter/group, formatting, theme
+frontend/src/hooks/          useAsync, useReviewProgress (SSE)
+frontend/src/components/     UI pieces, each with its own .css
+frontend/src/pages/          Home, Review (progress + results), Finding, NotFound
+frontend/src/styles/         design tokens (light/dark) and base styles
 ```
 
 ## Session log

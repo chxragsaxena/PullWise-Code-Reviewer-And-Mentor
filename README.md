@@ -22,5 +22,25 @@ backend/       Go REST API
   migrations/    PostgreSQL schema
   skills/        review skills: skill.yaml (what to check) + lessons/*.md (what to teach)
 frontend/      React + TypeScript + Vite dashboard
-docs/          architecture and project tracker
+docs/          architecture, API contract and project tracker
 ```
+
+## Run the frontend (demo mode, no backend needed)
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend ships with a mock API, so it works before the Go backend has the review endpoints.
+Set `VITE_API_MODE=http` (see `frontend/.env.example`) to use the real backend.
+
+## Run the backend
+
+```
+cd backend
+go run ./cmd/server
+```
+
+Serves `GET /healthz` on `:8080`.

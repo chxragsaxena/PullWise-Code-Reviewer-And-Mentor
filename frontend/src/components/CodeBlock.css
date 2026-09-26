@@ -1,0 +1,24 @@
+.code-block {
+  margin: 0 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  overflow: hidden;
+}
+.code-block figcaption {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.code-block pre {
+  overflow-x: auto;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+}
+.code-block code {
+  padding: 0;
+  background: none;
+}

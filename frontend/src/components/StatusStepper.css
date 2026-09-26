@@ -1,0 +1,57 @@
+.stepper {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+  padding: 0;
+  list-style: none;
+}
+.stepper__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Connector line between markers */
+.stepper__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0.8rem;
+  top: 1.9rem;
+  width: 2px;
+  height: calc(100% - 0.2rem);
+  background: var(--border-strong);
+}
+.stepper__step--done:not(:last-child)::after {
+  background: var(--ok-fg);
+}
+
+.stepper__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.stepper__step--done .stepper__marker {
+  border-color: var(--ok-fg);
+  background: var(--ok-fg);
+  color: var(--bg);
+}
+.stepper__step--active .stepper__marker {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+
+.stepper__step--pending .stepper__label {
+  color: var(--text-muted);
+}
+.stepper__step--active .stepper__label {
+  font-weight: 600;
+}

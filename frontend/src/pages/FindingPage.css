@@ -1,0 +1,36 @@
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.finding {
+  max-width: 48rem;
+}
+.finding section {
+  margin-bottom: var(--space-5);
+}
+.finding h2 {
+  font-size: var(--text-lg);
+}
+.finding__header {
+  margin-bottom: var(--space-5);
+}
+.finding__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.finding__lesson {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.finding__lesson > h2 {
+  margin-bottom: var(--space-4);
+  color: var(--accent);
+}

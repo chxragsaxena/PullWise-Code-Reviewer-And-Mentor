@@ -1,0 +1,26 @@
+.page-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  text-align: center;
+}
+.page-state strong {
+  color: var(--text);
+}
+.page-state--error {
+  border-style: solid;
+  border-color: var(--sev-critical-border);
+  background: var(--sev-critical-bg);
+  color: var(--text);
+}
+.page-state--error strong {
+  color: var(--sev-critical-fg);
+}
+.page-state .spinner {
+  margin-bottom: var(--space-1);
+}
