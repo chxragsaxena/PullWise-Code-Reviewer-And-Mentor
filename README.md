@@ -17,7 +17,10 @@ Go (`net/http`) · PostgreSQL · React + TypeScript + Vite · Tree-sitter + Semg
 ## Layout
 
 ```
+backend/       Go REST API
+  internal/      review pipeline packages
+  migrations/    PostgreSQL schema
+  skills/        review skills: skill.yaml (what to check) + lessons/*.md (what to teach)
+frontend/      React + TypeScript + Vite dashboard
 docs/          architecture and project tracker
-migrations/    PostgreSQL schema
-skills/        review skills: skill.yaml (what to check) + lessons/*.md (what to teach)
 ```
