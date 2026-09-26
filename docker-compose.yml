@@ -1,0 +1,28 @@
+# Local development services. Start with:  docker compose up -d db
+# Requires a .env file next to this one (copy .env.example and set a password).
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pullwise}
+      POSTGRES_DB: ${POSTGRES_DB:-pullwise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    ports:
+      # Bound to localhost only, so the database is not reachable from the network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # postgres:18 keeps its data under /var/lib/postgresql/18/, so mount the parent.
+      - pgdata:/var/lib/postgresql
+      # Files here run once, in name order, when the database is first created.
+      # Changing a migration later means resetting the volume: docker compose down -v
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

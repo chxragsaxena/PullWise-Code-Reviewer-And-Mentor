@@ -63,11 +63,11 @@ Status: `[x]` done, `[~]` written but unverified, `[ ]` not started
 - [x] `docs/api.md`: API contract v1, **approved by user** with corrections applied: `Review.error` is `{code, message}`; `Finding.line` is nullable (whole-file findings; Go domain uses 0 = whole file, DB column nullable); SSE event type is `ReviewStatusEvent`; no `total` field; `POST /api/reviews` must return 202 immediately and never block on GitHub/analysis (background goroutine). No auth/Redis/NATS/queue in V1.
 - [x] Frontend (React + TS + Vite) built against a mock API: Home, Review progress (SSE-style stream), Results dashboard, Finding detail with Markdown lesson; light/dark theme. `npm run typecheck`, `npm test` (47 tests), `npm run build` all pass. Not yet visually reviewed in a browser by Claude (no browser access); user should run `npm run dev` in `frontend/` and review.
 - [ ] Frontend: switch to real backend (`VITE_API_MODE=http`) once the Go endpoints exist; verify SSE against the real server
-- [ ] `docker-compose.yml` (Postgres with named volume, password from `.env`, migrations applied) + `.env.example`; run migration
+- [~] `docker-compose.yml` (postgres:18, named volume `pgdata` mounted at `/var/lib/postgresql`, localhost-only port, healthcheck, migrations from `backend/migrations` run on first init) + `.env.example`. Compose parses and refuses to start without `POSTGRES_PASSWORD`. **Blocked on the user creating `.env`** (copy `.env.example`, choose a password; keep `DATABASE_URL` in sync). Migration not yet applied. Changing a migration after first init needs `docker compose down -v`.
 - [x] `backend/go.mod` (module `github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor`, matches the GitHub repo, confirmed by user); layout `backend/`, `frontend/` per user
 - [~] Interfaces: `StaticAnalyzer` done in `internal/review`; `LLMProvider` not yet
 - [~] Skill loader done in `internal/skills` (strict validation, tests pass); syncing to the `skills` table not yet
-- [~] GitHub client: `ParsePRURL` done + tested in `internal/github`; fetching PR metadata/diff/files not yet
+- [x] GitHub client in `internal/github`: `ParsePRURL`; `Client` with `FetchPullRequest`, `ListFiles` (paginated, 3000-file cap), `FileContent` (raw at a commit, 2 MB cap); typed errors (`ErrNotFound`, `ErrRateLimited`, `ErrTooLarge`, `*APIError`); optional token via `GITHUB_TOKEN`. Tested against httptest servers only, **not yet against the live GitHub API**; do that in the end-to-end step.
 - [~] `cmd/server` + `internal/httpapi` + `internal/config`: server, graceful shutdown, recover/log middleware, standard JSON error body, `GET /healthz` done and smoke-tested; review endpoints not yet
 - [ ] Language detection from changed files
 - [ ] Skill selection
