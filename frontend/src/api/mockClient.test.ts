@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./client";
 import { FAILING_PR_NUMBER, createMockClient } from "./mockClient";
-import type { ReviewEvent } from "./types";
+import type { ReviewStatusEvent } from "./types";
 
 const fast = () => createMockClient({ latencyMs: 0, stepDelayMs: 1 });
 
-function collectUntilTerminal(client: ReturnType<typeof fast>, id: string): Promise<ReviewEvent[]> {
+function collectUntilTerminal(client: ReturnType<typeof fast>, id: string): Promise<ReviewStatusEvent[]> {
   return new Promise((resolve, reject) => {
-    const events: ReviewEvent[] = [];
+    const events: ReviewStatusEvent[] = [];
     const stop = client.subscribeToReview(id, {
       onEvent(event) {
         events.push(event);
@@ -58,7 +58,7 @@ describe("mock API client", () => {
     expect(events.at(-1)?.status).toBe("failed");
 
     const review = await client.getReview(created.id);
-    expect(review.error).toMatch(/not found/i);
+    expect(review.error).toMatchObject({ code: "pr_not_found", message: expect.stringMatching(/not found/i) });
     expect(review.findings).toEqual([]);
   });
 

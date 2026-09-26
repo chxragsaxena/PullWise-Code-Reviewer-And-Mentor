@@ -35,7 +35,10 @@ func TestFindingValidate(t *testing.T) {
 		{"deterministic below 1", func(f *Finding) { f.Confidence = 0.9 }, "must have confidence 1"},
 		{"ai below 1 is fine", func(f *Finding) { f.Source = SourceAI; f.Confidence = 0.7 }, ""},
 		{"no file", func(f *Finding) { f.File = "" }, "needs a file"},
-		{"line zero", func(f *Finding) { f.Line = 0 }, "needs a file"},
+		{"whole-file finding has no line", func(f *Finding) { f.Line = 0 }, ""},
+		{"negative line", func(f *Finding) { f.Line = -1 }, "invalid line range"},
+		{"valid range", func(f *Finding) { f.Line = 10; f.EndLine = 20 }, ""},
+		{"range ends before it starts", func(f *Finding) { f.Line = 10; f.EndLine = 5 }, "invalid line range"},
 		{"no evidence", func(f *Finding) { f.Evidence = "" }, "evidence is required"},
 	}
 	for _, tt := range tests {

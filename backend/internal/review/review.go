@@ -43,8 +43,8 @@ type Finding struct {
 	Severity    Severity
 	Confidence  float64
 	File        string
-	Line        int
-	EndLine     int
+	Line        int // 1-based; 0 means the finding applies to the whole file (null in the API and database)
+	EndLine     int // 0 when the finding is a single line or the whole file
 	Evidence    string
 	Found       string
 	Why         string
@@ -65,8 +65,10 @@ func (f Finding) Validate() error {
 		return fmt.Errorf("finding %s/%s: confidence %v out of range", f.SkillID, f.CheckID, f.Confidence)
 	case f.Source == SourceDeterministic && f.Confidence != 1:
 		return fmt.Errorf("finding %s/%s: deterministic findings must have confidence 1", f.SkillID, f.CheckID)
-	case f.File == "" || f.Line < 1:
-		return fmt.Errorf("finding %s/%s: needs a file and a line", f.SkillID, f.CheckID)
+	case f.File == "":
+		return fmt.Errorf("finding %s/%s: needs a file", f.SkillID, f.CheckID)
+	case f.Line < 0 || f.EndLine < 0 || (f.EndLine != 0 && f.EndLine < f.Line):
+		return fmt.Errorf("finding %s/%s: invalid line range %d-%d", f.SkillID, f.CheckID, f.Line, f.EndLine)
 	case f.Evidence == "":
 		return fmt.Errorf("finding %s/%s: evidence is required", f.SkillID, f.CheckID)
 	}

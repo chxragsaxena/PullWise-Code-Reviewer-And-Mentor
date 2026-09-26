@@ -1,4 +1,4 @@
-import type { ReviewEvent, ReviewStatus } from "../api/types";
+import type { ReviewStatusEvent, ReviewStatus } from "../api/types";
 import { STATUS_LABEL } from "../lib/status";
 import { StatusStepper } from "./StatusStepper";
 import "./ProgressView.css";
@@ -6,7 +6,7 @@ import "./ProgressView.css";
 interface ProgressViewProps {
   /** Status from the latest stream event, or the last fetched status before one arrives. */
   status: ReviewStatus;
-  events: readonly ReviewEvent[];
+  events: readonly ReviewStatusEvent[];
   streamError: Error | null;
 }
 

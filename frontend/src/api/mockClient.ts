@@ -3,7 +3,7 @@ import { LESSONS, buildFindings, buildPullRequest } from "./mockData";
 import type {
   FindingDetail,
   Review,
-  ReviewEvent,
+  ReviewStatusEvent,
   ReviewStatus,
   ReviewSummary,
 } from "./types";
@@ -29,8 +29,8 @@ const PIPELINE: readonly { status: ReviewStatus; message: string }[] = [
 
 interface StoredReview {
   review: Review;
-  latest: ReviewEvent;
-  listeners: Set<(event: ReviewEvent) => void>;
+  latest: ReviewStatusEvent;
+  listeners: Set<(event: ReviewStatusEvent) => void>;
 }
 
 const snapshot = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -75,7 +75,7 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
       review.counts = countBySeverity(review.findings);
       review.completedAt = new Date().toISOString();
     } else if (status === "failed") {
-      review.error = message;
+      review.error = { code: "pr_not_found", message };
       review.completedAt = new Date().toISOString();
     }
 
@@ -173,7 +173,7 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
       }
 
       let active = true;
-      const listener = (event: ReviewEvent) => {
+      const listener = (event: ReviewStatusEvent) => {
         if (active) onEvent(snapshot(event));
       };
       stored.listeners.add(listener);

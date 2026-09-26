@@ -31,7 +31,8 @@ describe("formatConfidence", () => {
 });
 
 describe("formatLocation", () => {
-  it("shows a single line or a range", () => {
+  it("shows the file alone, a single line or a range", () => {
+    expect(formatLocation("a.go", null, null)).toBe("a.go");
     expect(formatLocation("a.go", 4, null)).toBe("a.go:4");
     expect(formatLocation("a.go", 4, 4)).toBe("a.go:4");
     expect(formatLocation("a.go", 4, 9)).toBe("a.go:4-9");

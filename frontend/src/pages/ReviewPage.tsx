@@ -47,7 +47,7 @@ export function ReviewPage() {
         <PrSummary pullRequest={data.pullRequest} />
         <div className="page-state page-state--error" role="alert">
           <strong>The review could not be completed</strong>
-          <span>{data.error ?? "An unknown error occurred."}</span>
+          <span>{data.error?.message ?? "An unknown error occurred."}</span>
           <Link to="/" className="button button--secondary">
             Try another pull request
           </Link>

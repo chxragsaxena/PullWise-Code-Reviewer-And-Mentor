@@ -15,6 +15,15 @@ export type Severity = (typeof SEVERITIES)[number];
 
 export type FindingSource = "deterministic" | "ai";
 
+/**
+ * The error shape used by every failed request and by Review.error. Named
+ * ApiErrorBody here because ApiError is the class thrown by the client.
+ */
+export interface ApiErrorBody {
+  code: string;
+  message: string;
+}
+
 export interface PullRequest {
   owner: string;
   repo: string;
@@ -51,7 +60,8 @@ export interface Finding {
   /** 0..1, always 1 for deterministic findings. */
   confidence: number;
   file: string;
-  line: number;
+  /** null when the finding applies to the whole file. */
+  line: number | null;
   endLine: number | null;
   /** Code excerpt or measurement backing the finding. */
   evidence: string;
@@ -63,7 +73,7 @@ export interface Finding {
 
 export interface Review extends ReviewSummary {
   /** Set when status is "failed". */
-  error: string | null;
+  error: ApiErrorBody | null;
   /** Empty until the review completes. */
   findings: Finding[];
 }
@@ -78,7 +88,7 @@ export interface FindingDetail extends Finding {
 }
 
 /** One message on the review progress stream. */
-export interface ReviewEvent {
+export interface ReviewStatusEvent {
   status: ReviewStatus;
   message: string;
   at: string;

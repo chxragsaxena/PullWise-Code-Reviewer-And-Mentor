@@ -65,8 +65,8 @@ CREATE TABLE findings (
     severity     TEXT NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'suggestion')),
     confidence   REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),  -- 1.0 for deterministic
     file         TEXT NOT NULL,
-    line         INTEGER NOT NULL,
-    end_line     INTEGER,
+    line         INTEGER CHECK (line IS NULL OR line >= 1),  -- NULL = whole-file finding
+    end_line     INTEGER CHECK (end_line IS NULL OR end_line >= line),
     evidence     TEXT NOT NULL,          -- code excerpt or measurement ("cyclomatic complexity 18")
     found        TEXT NOT NULL,          -- "What we found"
     why          TEXT NOT NULL,          -- "Why this matters"

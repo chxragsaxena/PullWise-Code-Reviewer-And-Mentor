@@ -1,5 +1,5 @@
 import { ApiError, type ApiClient, type ProgressHandlers } from "./client";
-import { REVIEW_STATUSES, type FindingDetail, type Review, type ReviewEvent, type ReviewSummary } from "./types";
+import { REVIEW_STATUSES, type FindingDetail, type Review, type ReviewStatusEvent, type ReviewSummary } from "./types";
 import { isTerminal } from "../lib/status";
 
 /** Talks to the Go backend described in docs/api.md. */
@@ -82,15 +82,15 @@ function openEventStream(url: string, { onEvent, onError }: ProgressHandlers): (
   return () => source.close();
 }
 
-function parseEvent(data: string): ReviewEvent | null {
+function parseEvent(data: string): ReviewStatusEvent | null {
   try {
-    const value = JSON.parse(data) as Partial<ReviewEvent>;
+    const value = JSON.parse(data) as Partial<ReviewStatusEvent>;
     if (
       typeof value.message === "string" &&
       typeof value.at === "string" &&
-      REVIEW_STATUSES.includes(value.status as ReviewEvent["status"])
+      REVIEW_STATUSES.includes(value.status as ReviewStatusEvent["status"])
     ) {
-      return value as ReviewEvent;
+      return value as ReviewStatusEvent;
     }
   } catch {
     // Fall through.

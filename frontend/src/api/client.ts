@@ -1,4 +1,4 @@
-import type { FindingDetail, Review, ReviewEvent, ReviewSummary } from "./types";
+import type { FindingDetail, Review, ReviewStatusEvent, ReviewSummary } from "./types";
 
 /** Error carrying the backend's stable error code (see docs/api.md). */
 export class ApiError extends Error {
@@ -14,7 +14,7 @@ export class ApiError extends Error {
 }
 
 export interface ProgressHandlers {
-  onEvent: (event: ReviewEvent) => void;
+  onEvent: (event: ReviewStatusEvent) => void;
   onError: (error: Error) => void;
 }
 

@@ -23,7 +23,8 @@ export function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
-/** "file.go:42" or "file.go:42-60". */
-export function formatLocation(file: string, line: number, endLine: number | null): string {
+/** "file.go", "file.go:42" or "file.go:42-60". A null line means the whole file. */
+export function formatLocation(file: string, line: number | null, endLine: number | null): string {
+  if (line === null) return file;
   return endLine !== null && endLine > line ? `${file}:${line}-${endLine}` : `${file}:${line}`;
 }

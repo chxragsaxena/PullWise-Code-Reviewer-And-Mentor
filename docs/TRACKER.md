@@ -60,7 +60,7 @@ Status: `[x]` done, `[~]` written but unverified, `[ ]` not started
 - [~] `docs/architecture.md`
 - [x] Git repo created and pushed to GitHub (initial commit b344776); `.gitignore` and README added
 - [x] Install toolchain (see Environment): Go, Node, Git, WSL, Docker engine all working (Semgrep to run as a container later)
-- [x] `docs/api.md`: API contract v1 (proposed, pending user approval; backend must implement it)
+- [x] `docs/api.md`: API contract v1, **approved by user** with corrections applied: `Review.error` is `{code, message}`; `Finding.line` is nullable (whole-file findings; Go domain uses 0 = whole file, DB column nullable); SSE event type is `ReviewStatusEvent`; no `total` field; `POST /api/reviews` must return 202 immediately and never block on GitHub/analysis (background goroutine). No auth/Redis/NATS/queue in V1.
 - [x] Frontend (React + TS + Vite) built against a mock API: Home, Review progress (SSE-style stream), Results dashboard, Finding detail with Markdown lesson; light/dark theme. `npm run typecheck`, `npm test` (47 tests), `npm run build` all pass. Not yet visually reviewed in a browser by Claude (no browser access); user should run `npm run dev` in `frontend/` and review.
 - [ ] Frontend: switch to real backend (`VITE_API_MODE=http`) once the Go endpoints exist; verify SSE against the real server
 - [ ] `docker-compose.yml` (Postgres with named volume, password from `.env`, migrations applied) + `.env.example`; run migration
@@ -90,7 +90,7 @@ As of 2026-09-26:
 - Terminals/sessions opened before an install don't see new PATH entries; open a fresh one.
 
 ## Open questions
-- API contract (`docs/api.md`) needs the user's approval before the backend implements it.
+- Go-specific analyzers: `go/ast` (stdlib) can do context-not-first and complexity natively; Tree-sitter would then only be needed for TypeScript. Ask the user before deviating from "Tree-sitter for Go".
 - DB password: user wants to choose their own (not `dev`); keep it in a git-ignored `.env`, read by compose and the Go server via `DATABASE_URL`.
 - Claude model/pricing choice for the AI pass (decide when we reach it; use claude-api skill)
 
