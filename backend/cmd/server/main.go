@@ -13,8 +13,18 @@ import (
 	"time"
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/service"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/store"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/migrations"
+)
+
+const (
+	httpShutdownTimeout    = 10 * time.Second
+	reviewsShutdownTimeout = 30 * time.Second
 )
 
 func main() {
@@ -25,24 +35,84 @@ func main() {
 }
 
 func run() error {
-	cfg := config.Load()
-
-	loaded, err := skills.Load(os.DirFS(cfg.SkillsDir))
-	if err != nil {
-		return fmt.Errorf("load skills from %q: %w", cfg.SkillsDir, err)
+	// Real environment variables win over .env; the file is only a convenience.
+	// It is looked up here and in the parent, because the repo's .env sits beside
+	// backend/ when running from there.
+	if loaded, err := config.LoadDotEnv(".env", "../.env"); err != nil {
+		return fmt.Errorf("load .env: %w", err)
+	} else if len(loaded) > 0 {
+		slog.Info("loaded environment file", "paths", loaded)
 	}
-	slog.Info("skills loaded", "count", len(loaded))
 
-	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           httpapi.NewHandler(),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		IdleTimeout:       60 * time.Second,
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("invalid configuration:\n%w", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	loadedSkills, err := skills.Load(os.DirFS(cfg.SkillsDir))
+	if err != nil {
+		return fmt.Errorf("load skills from %q: %w", cfg.SkillsDir, err)
+	}
+	slog.Info("skills loaded", "count", len(loadedSkills))
+
+	db, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := store.Migrate(ctx, db, migrations.Files); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+
+	st := store.New(db)
+	if err := st.SyncSkills(ctx, loadedSkills); err != nil {
+		return err
+	}
+	// Reviews still in progress belong to a process that no longer exists. This
+	// assumes a single server instance; with several, do it only on one of them.
+	if n, err := st.FailInterrupted(ctx); err != nil {
+		return err
+	} else if n > 0 {
+		slog.Warn("marked reviews interrupted by the previous shutdown as failed", "count", n)
+	}
+
+	var opts []github.Option
+	if cfg.GitHubToken != "" {
+		opts = append(opts, github.WithToken(cfg.GitHubToken))
+	} else {
+		slog.Warn("GITHUB_TOKEN is not set: GitHub allows only 60 API requests per hour without one")
+	}
+
+	// No analyzers exist yet, so reviews complete without findings.
+	var analyzers []review.StaticAnalyzer
+	if len(analyzers) == 0 {
+		slog.Warn("no analyzers are registered: reviews will complete without findings")
+	}
+
+	svc := service.New(st, st, github.NewClient(opts...), service.Config{
+		Skills:        loadedSkills,
+		Analyzers:     analyzers,
+		MaxConcurrent: cfg.MaxConcurrentReviews,
+		MaxPending:    cfg.MaxQueuedReviews,
+		ReviewTimeout: cfg.ReviewTimeout,
+	})
+
+	api := httpapi.New(svc,
+		httpapi.WithReadiness(db.PingContext),
+		httpapi.WithCreateRateLimit(cfg.CreateRatePerMinute, cfg.CreateBurst),
+	)
+	srv := &http.Server{
+		Addr:              cfg.Addr,
+		Handler:           api.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		// No WriteTimeout: event streams stay open for as long as a review runs.
+	}
+	srv.RegisterOnShutdown(api.BeginShutdown)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -53,6 +123,7 @@ func run() error {
 	select {
 	case err := <-errCh:
 		if !errors.Is(err, http.ErrServerClosed) {
+			closeService(svc)
 			return fmt.Errorf("listen: %w", err)
 		}
 		return nil
@@ -60,10 +131,22 @@ func run() error {
 		slog.Info("shutting down")
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("shutdown: %w", err)
+	// Stop taking requests first, then let running reviews finish, then the
+	// deferred db.Close runs last so reviews can still save their results.
+	httpCtx, cancelHTTP := context.WithTimeout(context.Background(), httpShutdownTimeout)
+	defer cancelHTTP()
+	if err := srv.Shutdown(httpCtx); err != nil {
+		slog.Error("http shutdown", "error", err)
 	}
+	closeService(svc)
 	return nil
+}
+
+// closeService waits for running reviews, then interrupts whatever is left.
+func closeService(svc *service.Service) {
+	ctx, cancel := context.WithTimeout(context.Background(), reviewsShutdownTimeout)
+	defer cancel()
+	if err := svc.Close(ctx); err != nil {
+		slog.Warn("some reviews were interrupted by shutdown", "error", err)
+	}
 }
