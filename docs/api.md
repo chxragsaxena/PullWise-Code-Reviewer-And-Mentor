@@ -18,9 +18,31 @@ Conventions:
 | Status | Code | When |
 |---|---|---|
 | 400 | `invalid_pr_url` | `prUrl` is missing or not a GitHub PR link |
+| 400 | `invalid_request` | the body is not valid JSON, or `limit` is not a number |
 | 404 | `review_not_found` | unknown review id |
 | 404 | `finding_not_found` | unknown finding id for that review |
+| 404 | `not_found` | no such endpoint |
+| 405 | `method_not_allowed` | wrong HTTP method; the `Allow` header lists the right ones |
+| 413 | `request_too_large` | request body over 4 KB |
+| 415 | `unsupported_media_type` | POST body is not `application/json` |
+| 429 | `rate_limited` | too many reviews started from one address; see `Retry-After` |
 | 500 | `internal_error` | unexpected failure |
+| 503 | `server_busy` | the review queue is full; see `Retry-After` |
+| 503 | `shutting_down` | the server is restarting |
+| 503 | `not_ready` | `GET /readyz` only: the database is unreachable |
+
+Other endpoints: `GET /healthz` (liveness) and `GET /readyz` (readiness, checks the
+database), both returning `{"status":"ok"}`.
+
+**Review failure codes** (`Review.error.code`, and the last SSE message): `pr_not_found`
+(missing or private), `github_rate_limited`, `timeout`, `interrupted` (the server
+restarted mid-review), `analysis_failed`, `internal_error`.
+
+**Before the PR has been fetched** (status `queued`, and early in `fetching_pr`),
+`pullRequest` holds only `owner`, `repo` and `number`; `title`, `author`, `url` and
+`headSha` are empty strings and the counts and stats are 0. Clients should show a
+placeholder such as "Pull request #7" until the title arrives. The response to `POST`
+is in this state.
 
 ## Types
 

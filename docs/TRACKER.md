@@ -2,7 +2,8 @@
 
 > **For Claude: read this file first in every new session/context, and update it
 > at the end of every work session or whenever a decision is made.** It is the
-> source of truth for project state. Design detail lives in `architecture.md`.
+> source of truth for project state. Design detail lives in `architecture.md`,
+> the API contract in `api.md`.
 
 Last updated: 2026-09-26
 
@@ -16,17 +17,22 @@ findings must carry evidence, not LLM opinion.
 | # | Decision | Notes |
 |---|---|---|
 | 1 | Languages: Go first, then TypeScript | Skill system is language-aware so others can be added later |
-| 2 | LLM: Claude behind `LLMProvider` interface | Structured JSON output only, no prose parsing |
+| 2 | LLM: Claude behind `LLMProvider` interface | Structured JSON output only, no prose parsing. **No AI is used anywhere in the product yet.** |
 | 3 | Semgrep shelled out via `exec.Command`, JSON output | Behind `StaticAnalyzer` interface. Tree-sitter = our own AST analysis, Semgrep = established patterns |
 | 4 | First slice is deterministic-only; AI added after it works end to end | |
-| 5 | Backend: Go stdlib `net/http` (1.22+ routing), no Chi | Add deps only when they solve a real problem |
-| 6 | DB: PostgreSQL. No pgvector, Redis or NATS until needed | pgvector at V4 (repo RAG); Redis/NATS when async workers are needed |
+| 5 | Backend: Go stdlib `net/http` (1.22+ routing), no Chi | Add deps only when they solve a real problem. Deps so far: yaml.v3, pgx |
+| 6 | DB: PostgreSQL. No pgvector, Redis or NATS until needed | pgvector at V4 (repo RAG); Redis/NATS when durable async workers are needed |
 | 7 | Frontend: React + TypeScript + Vite | |
 | 8 | Comms: REST + SSE for review progress | |
 | 9 | Skills are files: `skill.yaml` (what to check) + `lessons/*.md` (what to teach) | DB `skills` table only mirrors them for FKs |
-| 10 | V1 = public PR URL only, no login | Server-side GitHub token in env var to avoid the 60 req/hr unauth limit |
+| 10 | V1 = public PR URL only, no login | Optional `GITHUB_TOKEN` env var raises the 60 req/hr unauthenticated limit |
 | 11 | Deterministic findings always confidence 1.0 | |
 | 12 | Findings are teaching units: found / why / improvement / lesson link | |
+| 13 | Reviews run on a **fixed worker pool over a bounded FIFO queue** (in-process), not a goroutine per review | `MAX_CONCURRENT_REVIEWS` workers, `MAX_QUEUED_REVIEWS` queue; full queue -> 503 `server_busy` |
+| 14 | The server applies migrations itself at startup (embedded, `schema_migrations` table, advisory lock); compose does NOT mount them | Migration files are `backend/migrations/NNNN_name.sql` |
+| 15 | Analyzers report only what they observed; **severity, source, confidence, titles and lesson come from the skill definition** | Findings for unknown/AI checks or invalid ones are dropped with a warning |
+| 16 | Review completion is one DB transaction (status + findings) | Startup marks leftover in-progress reviews `failed`/`interrupted` |
+| 17 | Before GitHub is queried, `pullRequest` has only owner/repo/number; title/author/url/headSha are empty strings | Documented in api.md; frontend shows "Pull request #N". Raised with the user: not yet explicitly confirmed |
 
 ## Responsibility split
 Code = review engine. YAML = what to check. Markdown = what to teach.
@@ -34,14 +40,16 @@ PostgreSQL = what happened. Claude = contextual reasoning (only `kind: ai` check
 
 ## Frontend decisions (confirmed by user)
 - Plain CSS with design tokens (no Tailwind); light + dark following the system, plus a manual toggle.
-- Data source: typed API client with a **mock implementation** for now; switch to the real Go API by config. Contract lives in `docs/api.md` (proposed, pending user approval; backend must follow it).
+- Data source: typed API client with a **mock implementation** for now; switch to the real Go API with `VITE_API_MODE=http`. Contract lives in `docs/api.md` (approved).
 - V1 screens (all four): Home (PR URL form + recent reviews), Review progress, Results dashboard (summary, severity/skill filters, findings), Finding detail (evidence, explanation, improvement, Markdown lesson).
 - React Router; plain typed `fetch`; no state-management or data-fetching library; **SSE for progress from the start (no polling)**; Vitest + React Testing Library; a list-reviews endpoint for recent reviews; Node 24 + npm.
 - UI must stay componentized so mock -> real API needs no UI changes (API client injected via React context).
+- The user will suggest visual/UX changes to the frontend later.
 
 ## Out of scope (do not build unless asked)
 Private repos, GitHub App/webhooks, Redis, NATS, repo RAG, auto-fix/rewrite,
 custom team skills, >2 languages, agentic architecture, microservices, IDE features.
+V2-V6 are not started and need the user's go-ahead.
 
 ## Roadmap
 - **V1** Public PR URL -> review -> educational dashboard (current)
@@ -51,73 +59,74 @@ custom team skills, >2 languages, agentic architecture, microservices, IDE featu
 - V5 Learning system: quizzes, practice, progress
 - V6 Custom team standards
 
-## V1 vertical slice, in order
-Status: `[x]` done, `[~]` written but unverified, `[ ]` not started
+Rough progress (2026-09-26): V1 core about 60% by effort; V1 + AI pass + extra skills about 40%; full V1-V6 roadmap about 15%. The infrastructure is solid; the **analyzers that produce findings are not started**.
 
-- [x] Project definition and architecture agreed
-- [~] Postgres schema: `migrations/0001_init.sql` (not run against a DB)
-- [~] Go skill: `skills/go/skill.yaml` + 4 lessons (error-handling, context, concurrency, interfaces)
-- [~] `docs/architecture.md`
-- [x] Git repo created and pushed to GitHub (initial commit b344776); `.gitignore` and README added
-- [x] Install toolchain (see Environment): Go, Node, Git, WSL, Docker engine all working (Semgrep to run as a container later)
-- [x] `docs/api.md`: API contract v1, **approved by user** with corrections applied: `Review.error` is `{code, message}`; `Finding.line` is nullable (whole-file findings; Go domain uses 0 = whole file, DB column nullable); SSE event type is `ReviewStatusEvent`; no `total` field; `POST /api/reviews` must return 202 immediately and never block on GitHub/analysis (background goroutine). No auth/Redis/NATS/queue in V1.
-- [x] Frontend (React + TS + Vite) built against a mock API: Home, Review progress (SSE-style stream), Results dashboard, Finding detail with Markdown lesson; light/dark theme. `npm run typecheck`, `npm test` (47 tests), `npm run build` all pass. Not yet visually reviewed in a browser by Claude (no browser access); user should run `npm run dev` in `frontend/` and review.
-- [ ] Frontend: switch to real backend (`VITE_API_MODE=http`) once the Go endpoints exist; verify SSE against the real server
-- [~] `docker-compose.yml` (postgres:18, named volume `pgdata` mounted at `/var/lib/postgresql`, localhost-only port, healthcheck, migrations from `backend/migrations` run on first init) + `.env.example`. Compose parses and refuses to start without `POSTGRES_PASSWORD`. **Blocked on the user creating `.env`** (copy `.env.example`, choose a password; keep `DATABASE_URL` in sync). Migration not yet applied. Changing a migration after first init needs `docker compose down -v`.
-- [x] `backend/go.mod` (module `github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor`, matches the GitHub repo, confirmed by user); layout `backend/`, `frontend/` per user
-- [~] Interfaces: `StaticAnalyzer` done in `internal/review`; `LLMProvider` not yet
-- [~] Skill loader done in `internal/skills` (strict validation, tests pass); syncing to the `skills` table not yet
-- [x] GitHub client in `internal/github`: `ParsePRURL`; `Client` with `FetchPullRequest`, `ListFiles` (paginated, 3000-file cap), `FileContent` (raw at a commit, 2 MB cap); typed errors (`ErrNotFound`, `ErrRateLimited`, `ErrTooLarge`, `*APIError`); optional token via `GITHUB_TOKEN`. Tested against httptest servers only, **not yet against the live GitHub API**; do that in the end-to-end step.
-- [~] `cmd/server` + `internal/httpapi` + `internal/config`: server, graceful shutdown, recover/log middleware, standard JSON error body, `GET /healthz` done and smoke-tested; review endpoints not yet
-- [ ] Language detection from changed files
-- [ ] Skill selection
-- [ ] Analyzers: metric (cyclomatic complexity), tree-sitter (context-not-first), Semgrep (ignored-error, http-call-without-context) + add Semgrep rule files and `rule:` refs to skill.yaml
-- [ ] Persist review + findings (transactional: review completes and findings save together)
-- [ ] `POST /api/reviews`, `GET /api/reviews/{id}`, SSE progress endpoint
-- [ ] React dashboard (PR summary, findings by severity, finding detail with lesson)
-- [ ] End-to-end test on a real public Go PR
-- [ ] **Then:** Claude pass (AI context builder -> Claude -> structured findings -> aggregator) for `kind: ai` checks
-- [ ] Then: TypeScript skill, REST skill, SOLID skill
+## V1 vertical slice
+Status: `[x]` done and verified, `[~]` partly done, `[ ]` not started
+
+- [x] Project definition, architecture, API contract (`docs/api.md`, approved with corrections), repo + GitHub, toolchain (Go, Node, Git, WSL2, Docker)
+- [x] Frontend on a mock API: 4 screens, light/dark, 47 tests, typecheck and build pass. Not yet reviewed visually by Claude (no browser); the user reviews via `npm run dev`
+- [x] Domain types + validation (`internal/review`), skill loader (`internal/skills`), language detection (`internal/lang`)
+- [x] GitHub client (`internal/github`): PR URL parsing, `FetchPullRequest`, `ListFiles`, `FileContent`, typed errors. **Verified against the live GitHub API** (gorilla/mux#1) via the running server
+- [x] PostgreSQL store (`internal/store`): schema, embedded migrations, all read/write operations, tested on real Postgres 18 (8 integration tests, skipped unless `TEST_DATABASE_URL` set)
+- [x] Review service (`internal/service`): create-and-return-immediately, worker pool + bounded queue, per-review timeout, panic recovery, error-code mapping, in-memory event broker, graceful `Close`
+- [x] HTTP layer (`internal/httpapi`): all endpoints from api.md, SSE stream with keep-alive, JSON errors for 404/405, body limit + Content-Type check, per-IP rate limit on POST, security headers, `/healthz` + `/readyz`
+- [x] Config + `.env` loader + `cmd/server` wiring with ordered graceful shutdown
+- [x] **End to end smoke test passed** (real server + real Postgres + real GitHub): queued -> fetching_pr -> analyzing -> completed over SSE, real PR metadata saved, failed review for a missing PR maps to `pr_not_found`, crash recovery marks leftovers `interrupted`
+- [ ] **Analyzers** (`review.StaticAnalyzer` implementations) for the Go skill's deterministic checks: `ignored-error`, `context-not-first`, `http-call-without-context`, `high-complexity`. **Open question: go/ast (stdlib) vs Tree-sitter for Go; Semgrep in a container for pattern checks. Ask the user first.** Add Semgrep rule files + `rule:` refs to skill.yaml if Semgrep is used
+- [ ] Register analyzers in `cmd/server/main.go` (currently none, so reviews complete with zero findings)
+- [ ] Frontend against the real backend (`VITE_API_MODE=http`), verify SSE through the Vite proxy, fix any contract mismatches
+- [ ] User creates `.env` (copy `.env.example`, choose `POSTGRES_PASSWORD`, matching `DATABASE_URL`, optional `GITHUB_TOKEN`), then `docker compose up -d db` and run the server for real
+- [ ] End-to-end test on a real public Go PR with real findings
+- [ ] **Then:** Claude pass: `LLMProvider` interface, AI context builder, structured findings, `reviewing` status (currently skipped), needs `ANTHROPIC_API_KEY` in `.env.example`
+- [ ] Then: TypeScript, REST and SOLID skills
 
 ## Environment
 Machine: Windows 11 Home, PowerShell. Workspace: `C:\Users\jyoti\OneDrive\Desktop\LearnCode`.
-Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (branch `main`, remote `origin`; local git identity chxragsaxena / chiragsaxena79@gmail.com). GitHub login is saved via Git Credential Manager. The push must be run by the user from a terminal (Claude's shell cannot show login prompts, but plain `git push` should work now that credentials are saved).
-As of 2026-09-26:
-- **Installed:** Go 1.27.1, Node 24.21.0 / npm 11.19.0, Git 2.55.0, WSL 2.7.14 (no Ubuntu; Docker backend only, user wants to work on Windows).
-- **Docker Desktop 29.8.0: engine running** (client/server 29.8.0, `docker-desktop` WSL2 distro running). It had been stuck because the backend process started before WSL was installed and never rechecked; fixed by fully killing Docker Desktop + `com.docker.backend` and relaunching. If it hangs again on "Starting the Docker Engine", check `%LOCALAPPDATA%\Docker\log\host\com.docker.backend.exe.log` for the first `[E]` line.
-- **Decision:** database runs in Docker (`postgres:18`), not a native install. The user manually removed the broken native PostgreSQL install.
-- **Not installed:** Semgrep, Python (Semgrep will run as a container instead).
+Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (branch `main`, remote `origin`; local git identity chxragsaxena / chiragsaxena79@gmail.com). GitHub login is saved via Git Credential Manager. Only the initial commit is pushed; everything after is local until the user pushes.
+- **Installed:** Go 1.27.1, Node 24.21.0 / npm 11.19.0, Git 2.55.0, WSL 2.7.14 (no Ubuntu; Docker backend only, user works on Windows), Docker Desktop 29.8.0.
+- **Docker Desktop must be running** for Postgres. If it is closed, relaunch `%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe` and wait for the engine. If it hangs on "Starting the Docker Engine", check `%LOCALAPPDATA%\Docker\log\host\com.docker.backend.exe.log` for the first `[E]` line (once it was a stale backend from before WSL was installed: kill Docker Desktop + `com.docker.backend`, relaunch).
+- **The user's own database:** `docker-compose.yml` (postgres:18, volume `pgdata`, localhost-only port 5432). Needs the user's `.env` (not created yet; Claude never reads its password).
+- **Claude's test database (throwaway):** container `pullwise-test-db`, DB `pullwise_test`, port 55432, random password (get it with `docker inspect pullwise-test-db`). Integration tests run with `TEST_DATABASE_URL`; the store tests wipe the schema and refuse any database whose name does not end in `_test`. Recreate it with `docker run -d --name pullwise-test-db -e POSTGRES_PASSWORD=<random> -e POSTGRES_DB=pullwise_test -p 127.0.0.1:55432:5432 postgres:18` if missing.
+- Not installed: Semgrep, Python (Semgrep would run as a container). The Go race detector needs cgo (no C compiler), so `go test -race` is unavailable.
 - Terminals/sessions opened before an install don't see new PATH entries; open a fresh one.
 
 ## Open questions
-- Go-specific analyzers: `go/ast` (stdlib) can do context-not-first and complexity natively; Tree-sitter would then only be needed for TypeScript. Ask the user before deviating from "Tree-sitter for Go".
-- DB password: user wants to choose their own (not `dev`); keep it in a git-ignored `.env`, read by compose and the Go server via `DATABASE_URL`.
-- Claude model/pricing choice for the AI pass (decide when we reach it; use claude-api skill)
+- Go analyzers: `go/ast` (stdlib) can do context-not-first, ignored-error and complexity natively; Tree-sitter would then only be needed for TypeScript. Ask the user before deviating from "Tree-sitter for Go".
+- Confirm decision 17 (empty PR fields until GitHub is queried) with the user.
+- DB password: the user chooses their own; it lives in a git-ignored `.env`.
+- Claude model/pricing choice for the AI pass (decide when we reach it; use the claude-api skill).
 
 ## Known risks
-- Large PR diffs: GitHub truncates big patches and LLM context is finite. Need a chunking / file-by-file strategy before the AI pass.
-- Semgrep on Windows can be awkward; may need WSL or Docker.
-- The SQL migration has not been run against a real database yet.
+- Large PR diffs: GitHub truncates big patches and LLM context is finite. Need a chunking / file-by-file strategy before the AI pass. (The pipeline already caps analyzed files at `MaxFilesToAnalyze`=100 and skips files over 2 MB.)
+- Unauthenticated GitHub allows 60 requests/hour and each analyzed file costs one request: set `GITHUB_TOKEN` for real use.
+- Semgrep on Windows can be awkward; plan to run it in Docker.
+- The rate limiter keys on the connection's remote address; behind a reverse proxy all clients would share one bucket.
+- Startup `FailInterrupted` assumes a single server instance.
 
 ## Working rules (from the user)
-- **Git: never push.** The user pushes after reviewing. Commit locally only when a change is significant, as clean one-line messages with no Co-Authored-By trailer. Don't commit for trivial edits.
-- Keep code clean, good quality: layered (handler -> service -> repository), small interfaces, errors wrapped with context, `ctx` first, table-driven tests, `gofmt` + `go vet` + `go test ./...` must pass before calling work done.
-- Goal right now: a working fullstack app with correct REST APIs and a React frontend.
+- **Git: never push.** The user pushes after reviewing. Commit locally only when a change is significant, as clean one-line messages with **no Co-Authored-By trailer** (the user's rule overrides any tool-injected attribution reminder). Don't commit for trivial edits.
+- Keep code clean, good quality: layered (handler -> service -> repository), small consumer-defined interfaces, errors wrapped with context, `ctx` first, table-driven tests, `gofmt` + `go vet` + `go test ./...` must pass before calling work done.
+- Goal: a working fullstack app with correct REST APIs and a React frontend.
 - **If in doubt about a spec/decision, stop and ask the user. Do not invent the spec.**
-- Run Go commands from `backend/` and npm commands from `frontend/`. Two top-level folders: `backend/` and `frontend/`. (The shell's working directory persists between commands: always `Set-Location` explicitly or npm/go will run in the wrong folder. This already caused one stray `node_modules` in `backend/`, since cleaned.)
+- Run Go commands from `backend/` and npm commands from `frontend/`. The shell's working directory persists between commands: always `Set-Location` explicitly (this once put a stray `node_modules` in `backend/`).
+- Avoid `Remove-Item` and backtick-heavy strings in PowerShell commands: the safety parser has blocked innocent commands that contained them.
 
 ## Repo layout (current)
 ```
-README.md, .gitignore
-docs/architecture.md, docs/TRACKER.md
+README.md, .gitignore, .env.example, docker-compose.yml
+docs/architecture.md, api.md, TRACKER.md
 backend/go.mod, go.sum
-backend/internal/review/     domain types (Finding, Severity), StaticAnalyzer interface
-backend/internal/github/     PR URL parsing
-backend/internal/skills/     skill loader + validation
-backend/internal/config/     env config (ADDR, SKILLS_DIR)
-backend/internal/httpapi/    router, middleware, JSON/error helpers
 backend/cmd/server/          entrypoint (run from backend/: go run ./cmd/server)
-backend/migrations/0001_init.sql
+backend/internal/review/     domain types (Review, Finding, Status...), StaticAnalyzer interface
+backend/internal/github/     PR URL parsing + GitHub REST client
+backend/internal/skills/     skill loader + validation
+backend/internal/lang/       language detection by file extension
+backend/internal/store/      PostgreSQL store + migration runner (+ integration tests)
+backend/internal/service/    review service: worker pool, pipeline, event broker
+backend/internal/httpapi/    REST + SSE handlers, DTOs, rate limit, middleware
+backend/internal/config/     env config + .env loader
+backend/migrations/          NNNN_name.sql + embed.go
 backend/skills/go/           skill.yaml + lessons/*.md
 frontend/                    React + TS + Vite app (run from frontend/: npm run dev | test | build)
 frontend/src/api/            ApiClient interface, mock + http clients, ApiProvider (context)
@@ -129,6 +138,7 @@ frontend/src/styles/         design tokens (light/dark) and base styles
 ```
 
 ## Session log
-- 2026-09-26: Defined project and scope through discussion; locked the 4 decisions above. Wrote schema, Go skill + lessons, architecture doc, this tracker. No code executed (no toolchain installed).
-- 2026-09-26 (later): Installed/verified Go, Node, Git, WSL2; Docker Desktop installed but engine not yet running. Project named PullWise. Repo pushed to GitHub. Next: get Docker engine running, write compose file, then Go module + interfaces + skill loader + GitHub client.
-- 2026-09-26 (later still): Split into `backend/` and `frontend/`. Wrote `internal/review`, `internal/github` (URL parser), `internal/skills` (loader) with tests; all pass, gofmt/vet clean. A test caught a loader bug (missing lesson file was silently skipping a skill); fixed. Module renamed to match the GitHub repo. Committed locally (not pushed).
+- 2026-09-26: Defined the project and scope; locked decisions; schema, Go skill + lessons, architecture doc, this tracker.
+- 2026-09-26: Installed/verified Go, Node, Git, WSL2, Docker (fixed a stuck Docker engine). Repo on GitHub, first commit pushed. Split into `backend/` and `frontend/`.
+- 2026-09-26: Built `internal/review`, `github` (URL parser + client), `skills`; HTTP skeleton; API contract approved with corrections; full React frontend on a mock API.
+- 2026-09-26: Built the rest of the backend: PostgreSQL store with embedded migrations (revised schema), review service with worker pool and event broker, all REST + SSE endpoints, config/.env loader, wiring with graceful shutdown. A test found a real design weakness (unordered goroutines) -> worker pool. Another found a routing gap (POST /healthz -> 404). End-to-end smoke test on live GitHub + real Postgres passed. All Go and frontend tests, vet, gofmt, build green. No analyzers yet, so reviews have zero findings. Not pushed.
