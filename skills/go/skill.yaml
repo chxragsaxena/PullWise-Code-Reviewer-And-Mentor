@@ -1,0 +1,55 @@
+# A skill is a packaged review capability: what to check (this file) and what to
+# teach (lessons/*.md). The engine loads every skills/*/skill.yaml at startup.
+id: go
+name: Go
+version: 1
+languages: [go]          # skill is selected only if the PR changes files in these languages
+description: >
+  Idiomatic Go: error handling, context propagation, concurrency safety and
+  interface design.
+
+# kind: deterministic -> computed by an analyzer, confidence is always 1.0
+# kind: ai            -> needs judgment; the LLM must cite evidence from the code
+# analyzer (deterministic only): semgrep | treesitter | metric
+# lesson: file name (without .md) in lessons/
+checks:
+  - id: ignored-error
+    title: Error return value is ignored
+    kind: deterministic
+    analyzer: semgrep
+    severity: high
+    lesson: error-handling
+
+  - id: context-not-first
+    title: context.Context is not the first parameter
+    kind: deterministic
+    analyzer: treesitter
+    severity: medium
+    lesson: context
+
+  - id: http-call-without-context
+    title: HTTP or database call made without a context
+    kind: deterministic
+    analyzer: semgrep
+    severity: medium
+    lesson: context
+
+  - id: high-complexity
+    title: Function has high cyclomatic complexity
+    kind: deterministic
+    analyzer: metric
+    threshold: 15
+    severity: medium
+    lesson: error-handling
+
+  - id: goroutine-leak-risk
+    title: Goroutine started with no way to stop or wait for it
+    kind: ai
+    severity: high
+    lesson: concurrency
+
+  - id: interface-too-large
+    title: Interface is larger than its consumers need
+    kind: ai
+    severity: suggestion
+    lesson: interfaces
