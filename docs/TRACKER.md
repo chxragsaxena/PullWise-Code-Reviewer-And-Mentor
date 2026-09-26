@@ -58,7 +58,7 @@ Status: `[x]` done, `[~]` written but unverified, `[ ]` not started
 - [~] Interfaces: `StaticAnalyzer` done in `internal/review`; `LLMProvider` not yet
 - [~] Skill loader done in `internal/skills` (strict validation, tests pass); syncing to the `skills` table not yet
 - [~] GitHub client: `ParsePRURL` done + tested in `internal/github`; fetching PR metadata/diff/files not yet
-- [ ] `cmd/server` main + HTTP layer (router, middleware, handlers)
+- [~] `cmd/server` + `internal/httpapi` + `internal/config`: server, graceful shutdown, recover/log middleware, standard JSON error body, `GET /healthz` done and smoke-tested; review endpoints not yet
 - [ ] Language detection from changed files
 - [ ] Skill selection
 - [ ] Analyzers: metric (cyclomatic complexity), tree-sitter (context-not-first), Semgrep (ignored-error, http-call-without-context) + add Semgrep rule files and `rule:` refs to skill.yaml
@@ -103,6 +103,9 @@ backend/go.mod, go.sum
 backend/internal/review/     domain types (Finding, Severity), StaticAnalyzer interface
 backend/internal/github/     PR URL parsing
 backend/internal/skills/     skill loader + validation
+backend/internal/config/     env config (ADDR, SKILLS_DIR)
+backend/internal/httpapi/    router, middleware, JSON/error helpers
+backend/cmd/server/          entrypoint (run from backend/: go run ./cmd/server)
 backend/migrations/0001_init.sql
 backend/skills/go/           skill.yaml + lessons/*.md
 frontend/                    empty (React + TS + Vite to come)
