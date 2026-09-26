@@ -68,6 +68,16 @@ func (s Skill) Lesson(name string) (string, error) {
 	return string(data), nil
 }
 
+// Check returns the check with the given id.
+func (s Skill) Check(id string) (Check, bool) {
+	for _, c := range s.Checks {
+		if c.ID == id {
+			return c, true
+		}
+	}
+	return Check{}, false
+}
+
 // AppliesTo reports whether the skill covers the given language.
 func (s Skill) AppliesTo(language string) bool {
 	for _, l := range s.Languages {
