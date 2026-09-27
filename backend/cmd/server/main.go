@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
@@ -86,11 +87,9 @@ func run() error {
 		slog.Warn("GITHUB_TOKEN is not set: GitHub allows only 60 API requests per hour without one")
 	}
 
-	// No analyzers exist yet, so reviews complete without findings.
-	var analyzers []review.StaticAnalyzer
-	if len(analyzers) == 0 {
-		slog.Warn("no analyzers are registered: reviews will complete without findings")
-	}
+	// go/ast covers the Go skill's deterministic checks. Tree-sitter is reserved
+	// for TypeScript and Semgrep for pattern-based checks, neither built yet.
+	analyzers := []review.StaticAnalyzer{goast.New(goast.Config{ComplexityThreshold: goComplexityThreshold(loadedSkills)})}
 
 	svc := service.New(st, st, github.NewClient(opts...), service.Config{
 		Skills:        loadedSkills,
@@ -140,6 +139,21 @@ func run() error {
 	}
 	closeService(svc)
 	return nil
+}
+
+// goComplexityThreshold reads the go skill's high-complexity threshold from
+// its skill.yaml, so the analyzer and the skill definition cannot drift apart.
+// It returns 0 (the analyzer's own default) if the skill or check is missing.
+func goComplexityThreshold(loaded []skills.Skill) int {
+	for _, sk := range loaded {
+		if sk.ID != "go" {
+			continue
+		}
+		if check, ok := sk.Check("high-complexity"); ok {
+			return check.Threshold
+		}
+	}
+	return 0
 }
 
 // closeService waits for running reviews, then interrupts whatever is left.
