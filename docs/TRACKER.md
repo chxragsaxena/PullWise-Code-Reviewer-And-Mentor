@@ -73,8 +73,9 @@ Status: `[x]` done and verified, `[~]` partly done, `[ ]` not started
 - [x] HTTP layer (`internal/httpapi`): all endpoints from api.md, SSE stream with keep-alive, JSON errors for 404/405, body limit + Content-Type check, per-IP rate limit on POST, security headers, `/healthz` + `/readyz`
 - [x] Config + `.env` loader + `cmd/server` wiring with ordered graceful shutdown
 - [x] **End to end smoke test passed** (real server + real Postgres + real GitHub): queued -> fetching_pr -> analyzing -> completed over SSE, real PR metadata saved, failed review for a missing PR maps to `pr_not_found`, crash recovery marks leftovers `interrupted`
-- [ ] **Analyzers** (`review.StaticAnalyzer` implementations) for the Go skill's deterministic checks: `ignored-error`, `context-not-first`, `http-call-without-context`, `high-complexity`. **Open question: go/ast (stdlib) vs Tree-sitter for Go; Semgrep in a container for pattern checks. Ask the user first.** Add Semgrep rule files + `rule:` refs to skill.yaml if Semgrep is used
-- [ ] Register analyzers in `cmd/server/main.go` (currently none, so reviews complete with zero findings)
+- [x] **Analyzers**: `internal/analyzer/goast` implements all 4 Go deterministic checks with `go/parser`/`go/ast` (user-approved: stdlib for Go, Tree-sitter reserved for TypeScript, Semgrep for pattern checks later). Import-aware (`context`/`net/http` resolved by actual import path, alias-safe, dot/blank-import-safe). 19 unit tests: true positives with exact line/evidence assertions for all 4 checks, plus explicit false-positive guards (map comma-ok, type-assertion comma-ok, two-value non-call assign, non-stdlib `context` package, local function named `Get`), a broken-syntax file that's skipped without failing the review, cancellation, and a check that the analyzer never sets severity/source/confidence/lesson (the service fills those from the skill).
+- [x] Registered in `cmd/server/main.go`; the complexity threshold is read from `skills/go/skill.yaml` so the two cannot drift apart.
+- [x] **Live verification against real GitHub PRs** (go-chi/chi#1, sirupsen/logrus#1): pipeline runs end to end (fetch -> analyze -> persist -> SSE -> completed) with **zero false positives** on real idiomatic Go code — confirmed by reading the actual fetched source, not assumed. A genuine **true-positive demo on a real PR was not obtained**: several PRs were scanned via their diffs (using up GitHub API quota, ~20/60 left) without finding one that trips these specific 4 checks in code that survived to be merged (expected — merged code from popular repos is usually clean). True-positive detection is proven instead by the unit tests, which is the appropriate place for it (deterministic, no network flakiness). Revisit with a `GITHUB_TOKEN` set (5000/hr) if a live true-positive demo is wanted later.
 - [ ] Frontend against the real backend (`VITE_API_MODE=http`), verify SSE through the Vite proxy, fix any contract mismatches
 - [ ] User creates `.env` (copy `.env.example`, choose `POSTGRES_PASSWORD`, matching `DATABASE_URL`, optional `GITHUB_TOKEN`), then `docker compose up -d db` and run the server for real
 - [ ] End-to-end test on a real public Go PR with real findings
@@ -92,8 +93,6 @@ Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (bra
 - Terminals/sessions opened before an install don't see new PATH entries; open a fresh one.
 
 ## Open questions
-- Go analyzers: `go/ast` (stdlib) can do context-not-first, ignored-error and complexity natively; Tree-sitter would then only be needed for TypeScript. Ask the user before deviating from "Tree-sitter for Go".
-- Confirm decision 17 (empty PR fields until GitHub is queried) with the user.
 - DB password: the user chooses their own; it lives in a git-ignored `.env`.
 - Claude model/pricing choice for the AI pass (decide when we reach it; use the claude-api skill).
 
@@ -103,6 +102,8 @@ Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (bra
 - Semgrep on Windows can be awkward; plan to run it in Docker.
 - The rate limiter keys on the connection's remote address; behind a reverse proxy all clients would share one bucket.
 - Startup `FailInterrupted` assumes a single server instance.
+- The `ignored-error` and `http-call-without-context` checks are syntactic heuristics (no `go/types`, since that needs the whole module graph, not one file): `ignored-error` can misfire on a call whose last result genuinely isn't an error (e.g. a `(value, ok)` lookup via a function call); `http-call-without-context` only covers the 4 net/http package functions with no context variant (`Get`/`Post`/`Head`/`PostForm`) and does not attempt a database-call check, which would need type info to avoid false positives on unrelated `Query`/`Exec` methods.
+- GitHub API quota used by manual verification during this session: ~40 of 60 unauthenticated requests. Resets hourly. Set `GITHUB_TOKEN` to avoid hitting this during real use.
 
 ## Working rules (from the user)
 - **Git: never push.** The user pushes after reviewing. Commit locally only when a change is significant, as clean one-line messages with **no Co-Authored-By trailer** (the user's rule overrides any tool-injected attribution reminder). Don't commit for trivial edits.
@@ -124,6 +125,7 @@ backend/internal/skills/     skill loader + validation
 backend/internal/lang/       language detection by file extension
 backend/internal/store/      PostgreSQL store + migration runner (+ integration tests)
 backend/internal/service/    review service: worker pool, pipeline, event broker
+backend/internal/analyzer/goast/  Go deterministic checks via go/parser + go/ast
 backend/internal/httpapi/    REST + SSE handlers, DTOs, rate limit, middleware
 backend/internal/config/     env config + .env loader
 backend/migrations/          NNNN_name.sql + embed.go
@@ -142,3 +144,4 @@ frontend/src/styles/         design tokens (light/dark) and base styles
 - 2026-09-26: Installed/verified Go, Node, Git, WSL2, Docker (fixed a stuck Docker engine). Repo on GitHub, first commit pushed. Split into `backend/` and `frontend/`.
 - 2026-09-26: Built `internal/review`, `github` (URL parser + client), `skills`; HTTP skeleton; API contract approved with corrections; full React frontend on a mock API.
 - 2026-09-26: Built the rest of the backend: PostgreSQL store with embedded migrations (revised schema), review service with worker pool and event broker, all REST + SSE endpoints, config/.env loader, wiring with graceful shutdown. A test found a real design weakness (unordered goroutines) -> worker pool. Another found a routing gap (POST /healthz -> 404). End-to-end smoke test on live GitHub + real Postgres passed. All Go and frontend tests, vet, gofmt, build green. No analyzers yet, so reviews have zero findings. Not pushed.
+- 2026-09-27: User approved go/ast (stdlib) for all 4 Go checks; Tree-sitter stays reserved for TypeScript, Semgrep for pattern checks; confirmed the async POST contract and partial-PR-metadata behavior. Built `internal/analyzer/goast` (ignored-error, context-not-first, http-call-without-context, high-complexity), import-aware and alias-safe, 19 unit tests all passing. Wired into `cmd/server`. Verified live against real GitHub PRs (go-chi/chi#1, sirupsen/logrus#1): full pipeline works, zero false positives on real code; did not find a live true-positive PR within a reasonable GitHub API budget (true positives are proven by unit tests instead). All Go tests (incl. Postgres integration) and frontend tests/build still green. Not pushed. Next: register the analyzer's output was already done — next real milestone is either a true-positive live demo (optional) or the Claude AI pass / TypeScript+REST+SOLID skills, per the user.
