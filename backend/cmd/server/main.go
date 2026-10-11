@@ -15,6 +15,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/tsast"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/auth"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
@@ -121,10 +122,37 @@ func run() error {
 		ReviewTimeout: cfg.ReviewTimeout,
 	})
 
-	api := httpapi.New(svc,
+	apiOpts := []httpapi.Option{
 		httpapi.WithReadiness(db.PingContext),
 		httpapi.WithCreateRateLimit(cfg.CreateRatePerMinute, cfg.CreateBurst),
-	)
+	}
+
+	// GitHub OAuth login (V2) is optional: without a client ID, every
+	// /auth/* route degrades to "not configured" / "not logged in", and the
+	// rest of the app (anonymous public-PR review) is unaffected.
+	if cfg.GitHubOAuthClientID != "" {
+		key, err := auth.DecodeKey(cfg.SessionSecret)
+		if err != nil {
+			return fmt.Errorf("decode SESSION_SECRET: %w", err)
+		}
+		encryptor, err := auth.NewEncryptor(key)
+		if err != nil {
+			return fmt.Errorf("build token encryptor: %w", err)
+		}
+		oauth := auth.NewOAuth(cfg.GitHubOAuthClientID, cfg.GitHubOAuthClientSecret, cfg.GitHubOAuthRedirectURL)
+		authSvc := auth.NewService(oauth, encryptor, st)
+		apiOpts = append(apiOpts, httpapi.WithAuth(authSvc, cfg.FrontendURL, cfg.SecureCookies))
+
+		if n, err := st.DeleteExpiredSessions(ctx); err != nil {
+			slog.Warn("delete expired sessions", "error", err)
+		} else if n > 0 {
+			slog.Info("deleted expired sessions", "count", n)
+		}
+	} else {
+		slog.Warn("GITHUB_OAUTH_CLIENT_ID is not set: GitHub login is disabled")
+	}
+
+	api := httpapi.New(svc, apiOpts...)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           api.Handler(),

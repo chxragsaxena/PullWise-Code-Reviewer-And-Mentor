@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"net/url"
 	"os"
 	"strings"
@@ -60,9 +61,14 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err := Migrate(context.Background(), s.db, migrations.Files); err != nil {
 		t.Fatalf("second Migrate: %v", err)
 	}
+
+	want, err := fs.Glob(migrations.Files, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var n int
-	if err := s.db.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&n); err != nil || n != 1 {
-		t.Fatalf("schema_migrations rows = %d, err = %v; want exactly 1", n, err)
+	if err := s.db.QueryRow("SELECT count(*) FROM schema_migrations").Scan(&n); err != nil || n != len(want) {
+		t.Fatalf("schema_migrations rows = %d, err = %v; want exactly %d (one per migration file)", n, err, len(want))
 	}
 }
 

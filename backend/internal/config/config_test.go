@@ -14,6 +14,8 @@ func clearEnv(t *testing.T) {
 	for _, key := range []string{
 		"ADDR", "SKILLS_DIR", "DATABASE_URL", "GITHUB_TOKEN", "GROQ_API_KEY", "MAX_CONCURRENT_REVIEWS",
 		"MAX_QUEUED_REVIEWS", "CREATE_RATE_PER_MINUTE", "CREATE_BURST", "REVIEW_TIMEOUT",
+		"GITHUB_OAUTH_CLIENT_ID", "GITHUB_OAUTH_CLIENT_SECRET", "GITHUB_OAUTH_REDIRECT_URL",
+		"SESSION_SECRET", "FRONTEND_URL", "SECURE_COOKIES",
 	} {
 		t.Setenv(key, "")
 	}
@@ -31,6 +33,8 @@ func TestLoadDefaults(t *testing.T) {
 		Addr: ":8080", SkillsDir: "skills", DatabaseURL: "postgres://x",
 		MaxConcurrentReviews: 2, MaxQueuedReviews: 50, ReviewTimeout: 5 * time.Minute,
 		CreateRatePerMinute: 20, CreateBurst: 10,
+		GitHubOAuthRedirectURL: "http://localhost:8080/auth/github/callback",
+		FrontendURL:            "http://localhost:5173",
 	}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
@@ -49,6 +53,12 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("CREATE_RATE_PER_MINUTE", "0") // turns the limit off
 	t.Setenv("CREATE_BURST", "3")
 	t.Setenv("REVIEW_TIMEOUT", "90s")
+	t.Setenv("GITHUB_OAUTH_CLIENT_ID", "oauth-id")
+	t.Setenv("GITHUB_OAUTH_CLIENT_SECRET", "oauth-secret")
+	t.Setenv("GITHUB_OAUTH_REDIRECT_URL", "https://example.com/callback")
+	t.Setenv("SESSION_SECRET", "c2Vzc2lvbi1zZWNyZXQtMzItYnl0ZXMtbG9uZy0h")
+	t.Setenv("FRONTEND_URL", "https://example.com")
+	t.Setenv("SECURE_COOKIES", "true")
 
 	got, err := Load()
 	if err != nil {
@@ -58,9 +68,35 @@ func TestLoadFromEnv(t *testing.T) {
 		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x", GroqAPIKey: "gsk_x",
 		MaxConcurrentReviews: 4, MaxQueuedReviews: 8, ReviewTimeout: 90 * time.Second,
 		CreateRatePerMinute: 0, CreateBurst: 3,
+		GitHubOAuthClientID: "oauth-id", GitHubOAuthClientSecret: "oauth-secret",
+		GitHubOAuthRedirectURL: "https://example.com/callback",
+		SessionSecret:          "c2Vzc2lvbi1zZWNyZXQtMzItYnl0ZXMtbG9uZy0h",
+		FrontendURL:            "https://example.com",
+		SecureCookies:          true,
 	}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestLoadRequiresSessionSecretWhenOAuthIsConfigured(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("GITHUB_OAUTH_CLIENT_ID", "oauth-id")
+	// SESSION_SECRET deliberately left unset.
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SESSION_SECRET") {
+		t.Fatalf("error = %v, want it to require SESSION_SECRET", err)
+	}
+}
+
+func TestLoadAllowsOAuthDisabledWithoutSessionSecret(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://x")
+	// Neither OAuth nor SESSION_SECRET set: login is simply disabled.
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load: %v", err)
 	}
 }
 

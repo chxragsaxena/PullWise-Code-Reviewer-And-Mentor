@@ -23,6 +23,20 @@ type Config struct {
 	// disables it — reviews stay deterministic-only, exactly as before it existed.
 	GroqAPIKey string
 
+	// GitHub OAuth (login). Empty ClientID disables login entirely — every
+	// /auth/* route then degrades to "not configured" / "not logged in".
+	GitHubOAuthClientID     string
+	GitHubOAuthClientSecret string
+	GitHubOAuthRedirectURL  string
+	// SessionSecret is the base64-encoded AES-256 key used to encrypt stored
+	// GitHub tokens. Generate 32 random bytes and base64-encode them.
+	SessionSecret string
+	// FrontendURL is where the browser is sent after a successful login.
+	FrontendURL string
+	// SecureCookies marks session/state cookies Secure (HTTPS-only). Leave
+	// false for local HTTP development.
+	SecureCookies bool
+
 	// MaxConcurrentReviews is how many reviews are processed at once.
 	MaxConcurrentReviews int
 	// MaxQueuedReviews is how many reviews may wait for a free worker.
@@ -46,9 +60,19 @@ func Load() (Config, error) {
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		GitHubToken: os.Getenv("GITHUB_TOKEN"),
 		GroqAPIKey:  os.Getenv("GROQ_API_KEY"),
+
+		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
+		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+		GitHubOAuthRedirectURL:  getenv("GITHUB_OAUTH_REDIRECT_URL", "http://localhost:8080/auth/github/callback"),
+		SessionSecret:           os.Getenv("SESSION_SECRET"),
+		FrontendURL:             getenv("FRONTEND_URL", "http://localhost:5173"),
+		SecureCookies:           os.Getenv("SECURE_COOKIES") == "true",
 	}
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL is required (see .env.example)"))
+	}
+	if c.GitHubOAuthClientID != "" && c.SessionSecret == "" {
+		errs = append(errs, errors.New("SESSION_SECRET is required when GITHUB_OAUTH_CLIENT_ID is set"))
 	}
 
 	c.MaxConcurrentReviews = intEnv("MAX_CONCURRENT_REVIEWS", 2, 1, &errs)

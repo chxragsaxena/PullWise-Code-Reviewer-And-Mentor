@@ -27,6 +27,13 @@ type API struct {
 	heartbeat time.Duration
 	create    *limiter // nil when rate limiting is off
 
+	// auth is nil when GitHub login is not configured — every /auth/*
+	// handler then degrades to "not logged in" or 404, matching the
+	// project's pattern for optional features (GITHUB_TOKEN, GROQ_API_KEY).
+	auth          AuthService
+	frontendURL   string
+	secureCookies bool
+
 	done     chan struct{} // closed by BeginShutdown to end open event streams
 	doneOnce sync.Once
 }
@@ -56,6 +63,13 @@ func WithCreateRateLimit(perMinute, burst int) Option {
 	}
 }
 
+// WithAuth enables GitHub login. frontendURL is where the browser is sent
+// after a successful login; secureCookies marks session/state cookies
+// Secure, which requires HTTPS — leave this off for local HTTP development.
+func WithAuth(svc AuthService, frontendURL string, secureCookies bool) Option {
+	return func(a *API) { a.auth, a.frontendURL, a.secureCookies = svc, frontendURL, secureCookies }
+}
+
 // New builds an API over a review service.
 func New(svc ReviewService, opts ...Option) *API {
 	a := &API{svc: svc, heartbeat: 15 * time.Second, done: make(chan struct{})}
@@ -83,6 +97,12 @@ func (a *API) Handler() http.Handler {
 	mux.Handle("/api/reviews/{id}", methods{http.MethodGet: a.getReview})
 	mux.Handle("/api/reviews/{id}/events", methods{http.MethodGet: a.streamEvents})
 	mux.Handle("/api/reviews/{id}/findings/{findingId}", methods{http.MethodGet: a.getFinding})
+
+	mux.Handle("/auth/github/login", methods{http.MethodGet: a.handleLogin})
+	mux.Handle("/auth/github/callback", methods{http.MethodGet: a.handleCallback})
+	mux.Handle("/auth/me", methods{http.MethodGet: a.handleMe})
+	mux.Handle("/auth/logout", methods{http.MethodPost: a.handleLogout})
+
 	mux.HandleFunc("/", notFound)
 
 	// recoverer is outermost so a panic in any handler or middleware is caught.
