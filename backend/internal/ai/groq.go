@@ -24,10 +24,11 @@ const groqDefaultBaseURL = "https://api.groq.com/openai/v1"
 // completions API using plain net/http: the wire format is a handful of
 // JSON fields, so a full SDK dependency buys nothing here.
 type GroqProvider struct {
-	apiKey  string
-	model   string
-	baseURL string
-	http    *http.Client
+	apiKey       string
+	model        string
+	systemPrompt string
+	baseURL      string
+	http         *http.Client
 }
 
 // GroqOption configures a GroqProvider.
@@ -35,6 +36,11 @@ type GroqOption func(*GroqProvider)
 
 // WithGroqModel overrides DefaultGroqModel.
 func WithGroqModel(model string) GroqOption { return func(p *GroqProvider) { p.model = model } }
+
+// WithGroqSystemPrompt overrides the reviewer's system prompt (see LoadSystemPrompt).
+func WithGroqSystemPrompt(prompt string) GroqOption {
+	return func(p *GroqProvider) { p.systemPrompt = prompt }
+}
 
 // WithGroqBaseURL points the client at another host (used by tests).
 func WithGroqBaseURL(baseURL string) GroqOption { return func(p *GroqProvider) { p.baseURL = baseURL } }
@@ -45,10 +51,11 @@ func WithGroqHTTPClient(c *http.Client) GroqOption { return func(p *GroqProvider
 // NewGroqProvider builds a provider authenticated with apiKey.
 func NewGroqProvider(apiKey string, opts ...GroqOption) *GroqProvider {
 	p := &GroqProvider{
-		apiKey:  apiKey,
-		model:   DefaultGroqModel,
-		baseURL: groqDefaultBaseURL,
-		http:    &http.Client{Timeout: 60 * time.Second},
+		apiKey:       apiKey,
+		model:        DefaultGroqModel,
+		systemPrompt: defaultSystemPrompt,
+		baseURL:      groqDefaultBaseURL,
+		http:         &http.Client{Timeout: 60 * time.Second},
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -120,7 +127,7 @@ func (p *GroqProvider) Review(ctx context.Context, input ReviewInput) ([]Finding
 	body := groqRequest{
 		Model: p.model,
 		Messages: []groqMessage{
-			{Role: "system", Content: systemPrompt},
+			{Role: "system", Content: p.systemPrompt},
 			{Role: "user", Content: buildPrompt(input)},
 		},
 		MaxTokens: maxTokens,

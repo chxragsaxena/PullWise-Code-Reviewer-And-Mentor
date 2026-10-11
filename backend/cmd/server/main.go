@@ -94,9 +94,16 @@ func run() error {
 
 	// The AI pass (kind: ai checks) runs on Groq, free and fast; see
 	// internal/ai/groq.go for why. Nil disables it entirely if no key is set.
+	// The system prompt lives in skills/system_prompt.md, editable like any
+	// other skill/lesson file, with a built-in fallback if it's ever removed.
+	systemPrompt, err := ai.LoadSystemPrompt(os.DirFS(cfg.SkillsDir))
+	if err != nil {
+		return fmt.Errorf("load system prompt: %w", err)
+	}
+
 	var aiProvider ai.Provider
 	if cfg.GroqAPIKey != "" {
-		aiProvider = ai.NewGroqProvider(cfg.GroqAPIKey)
+		aiProvider = ai.NewGroqProvider(cfg.GroqAPIKey, ai.WithGroqSystemPrompt(systemPrompt))
 	} else {
 		slog.Warn("GROQ_API_KEY is not set: the AI review pass is disabled, reviews will be deterministic-only")
 	}

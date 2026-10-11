@@ -33,8 +33,9 @@ func reportFindingsTool() anthropic.ToolParam {
 
 // ClaudeProvider implements Provider using the Anthropic Messages API.
 type ClaudeProvider struct {
-	client *anthropic.Client
-	model  anthropic.Model
+	client       *anthropic.Client
+	model        anthropic.Model
+	systemPrompt string
 	// requestOpts accumulates options (e.g. a test base URL) applied before
 	// the client is built in NewClaudeProvider.
 	requestOpts []option.RequestOption
@@ -48,6 +49,11 @@ func WithModel(model string) ClaudeOption {
 	return func(p *ClaudeProvider) { p.model = anthropic.Model(model) }
 }
 
+// WithSystemPrompt overrides the reviewer's system prompt (see LoadSystemPrompt).
+func WithSystemPrompt(prompt string) ClaudeOption {
+	return func(p *ClaudeProvider) { p.systemPrompt = prompt }
+}
+
 // WithBaseURL points the client at another host (used by tests).
 func WithBaseURL(baseURL string) ClaudeOption {
 	return func(p *ClaudeProvider) { p.requestOpts = append(p.requestOpts, option.WithBaseURL(baseURL)) }
@@ -55,7 +61,7 @@ func WithBaseURL(baseURL string) ClaudeOption {
 
 // NewClaudeProvider builds a provider authenticated with apiKey.
 func NewClaudeProvider(apiKey string, opts ...ClaudeOption) *ClaudeProvider {
-	p := &ClaudeProvider{model: DefaultModel}
+	p := &ClaudeProvider{model: DefaultModel, systemPrompt: defaultSystemPrompt}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -77,7 +83,7 @@ func (p *ClaudeProvider) Review(ctx context.Context, input ReviewInput) ([]Findi
 	resp, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:      p.model,
 		MaxTokens:  maxTokens,
-		System:     []anthropic.TextBlockParam{{Text: systemPrompt}},
+		System:     []anthropic.TextBlockParam{{Text: p.systemPrompt}},
 		Messages:   []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(buildPrompt(input)))},
 		Tools:      []anthropic.ToolUnionParam{{OfTool: toolPtr(reportFindingsTool())}},
 		ToolChoice: anthropic.ToolChoiceParamOfTool(reportToolName),
