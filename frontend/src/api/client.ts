@@ -1,4 +1,4 @@
-import type { FindingDetail, Review, ReviewStatusEvent, ReviewSummary } from "./types";
+import type { AuthUser, FindingDetail, Review, ReviewStatusEvent, ReviewSummary } from "./types";
 
 /** Error carrying the backend's stable error code (see docs/api.md). */
 export class ApiError extends Error {
@@ -34,4 +34,10 @@ export interface ApiClient {
    * Returns a function that stops the stream.
    */
   subscribeToReview(id: string, handlers: ProgressHandlers): () => void;
+
+  /** The signed-in user, or null if signed out. Always resolves, never throws. */
+  getCurrentUser(): Promise<AuthUser | null>;
+  /** Starts GitHub sign-in. The http client navigates the browser away; the mock client simulates success in place. */
+  login(): Promise<void>;
+  logout(): Promise<void>;
 }

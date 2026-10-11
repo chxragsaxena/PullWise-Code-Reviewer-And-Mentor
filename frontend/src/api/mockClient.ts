@@ -1,6 +1,7 @@
 import { ApiError, type ApiClient } from "./client";
 import { LESSONS, buildFindings, buildPullRequest } from "./mockData";
 import type {
+  AuthUser,
   FindingDetail,
   Review,
   ReviewStatusEvent,
@@ -9,6 +10,14 @@ import type {
 } from "./types";
 import { countBySeverity } from "../lib/findings";
 import { parsePrUrl } from "../lib/prUrl";
+
+/** Signed in by createMockClient's login(), since there is no real GitHub to redirect to. */
+const MOCK_USER: AuthUser = {
+  id: "mock-1",
+  login: "octocat",
+  name: "The Octocat",
+  avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
+};
 
 export interface MockClientOptions {
   /** Simulated network latency per request, in ms. */
@@ -53,6 +62,7 @@ function toSummary(review: Review): ReviewSummary {
 export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockClientOptions = {}): ApiClient {
   const store = new Map<string, StoredReview>();
   let nextId = 1;
+  let currentUser: AuthUser | null = null;
 
   function respond<T>(produce: () => T): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -184,6 +194,22 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
         active = false;
         stored.listeners.delete(listener);
       };
+    },
+
+    getCurrentUser() {
+      return respond(() => currentUser);
+    },
+
+    login() {
+      return respond(() => {
+        currentUser = MOCK_USER;
+      });
+    },
+
+    logout() {
+      return respond(() => {
+        currentUser = null;
+      });
     },
   };
 }

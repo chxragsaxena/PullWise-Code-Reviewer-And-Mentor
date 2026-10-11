@@ -1,0 +1,25 @@
+.auth-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.auth-status__avatar {
+  border-radius: 50%;
+  display: block;
+}
+
+.auth-status__login-name {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.auth-status__login {
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .auth-status__login-name {
+    display: none;
+  }
+}

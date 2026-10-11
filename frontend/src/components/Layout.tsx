@@ -1,4 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
+import { AuthStatus } from "./AuthStatus";
 import { ThemeToggle } from "./ThemeToggle";
 import "./Layout.css";
 
@@ -30,6 +31,7 @@ export function Layout() {
             <span>PullWise</span>
           </Link>
           <span className="app-header__tagline">Code review that teaches</span>
+          <AuthStatus />
           <ThemeToggle />
         </div>
       </header>

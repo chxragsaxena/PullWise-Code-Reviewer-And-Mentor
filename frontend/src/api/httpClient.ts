@@ -1,5 +1,12 @@
 import { ApiError, type ApiClient, type ProgressHandlers } from "./client";
-import { REVIEW_STATUSES, type FindingDetail, type Review, type ReviewStatusEvent, type ReviewSummary } from "./types";
+import {
+  REVIEW_STATUSES,
+  type AuthUser,
+  type FindingDetail,
+  type Review,
+  type ReviewStatusEvent,
+  type ReviewSummary,
+} from "./types";
 import { isTerminal } from "../lib/status";
 
 /** Talks to the Go backend described in docs/api.md. */
@@ -10,7 +17,9 @@ export function createHttpClient(baseUrl = ""): ApiClient {
 
     let response: Response;
     try {
-      response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+      // Same-origin in both dev (Vite proxies /auth and /api to the backend)
+      // and prod, so the session cookie needs no cross-origin CORS handling.
+      response = await fetch(`${baseUrl}${path}`, { ...init, headers, credentials: "same-origin" });
     } catch {
       throw new ApiError("network_error", "Could not reach the server. Check your connection and try again.", 0);
     }
@@ -42,6 +51,21 @@ export function createHttpClient(baseUrl = ""): ApiClient {
 
     subscribeToReview(id, handlers) {
       return openEventStream(`${baseUrl}/api/reviews/${encodeURIComponent(id)}/events`, handlers);
+    },
+
+    async getCurrentUser() {
+      const body = await request<{ user: AuthUser | null }>("/auth/me");
+      return body.user;
+    },
+
+    async login() {
+      // A full browser navigation, not a fetch: GitHub needs to see the
+      // actual redirect chain, and the response sets an HttpOnly cookie.
+      window.location.href = `${baseUrl}/auth/github/login`;
+    },
+
+    async logout() {
+      await request("/auth/logout", { method: "POST" });
     },
   };
 }

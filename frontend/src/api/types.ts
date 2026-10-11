@@ -93,3 +93,11 @@ export interface ReviewStatusEvent {
   message: string;
   at: string;
 }
+
+/** The signed-in GitHub user, from GET /auth/me. */
+export interface AuthUser {
+  id: string;
+  login: string;
+  name: string;
+  avatarUrl: string;
+}
