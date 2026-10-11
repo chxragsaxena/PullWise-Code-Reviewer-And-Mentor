@@ -59,7 +59,7 @@ V3-V6 are not started. **V2 (GitHub OAuth) is in progress** — backend and logi
 - V5 Learning system: quizzes, practice, progress
 - V6 Custom team standards
 
-Rough progress (2026-09-26): V1 core about 60% by effort; V1 + AI pass + extra skills about 40%; full V1-V6 roadmap about 15%. The infrastructure is solid; the **analyzers that produce findings are not started**.
+Rough progress (2026-10-11): **V1 is 100% done** (fully built, tested, live-verified). **V2 is about 70%**: OAuth backend + frontend login UI done and live-verified; a logged-in user's own GitHub token is not yet wired into review creation (the actual point of V2) and token refresh isn't implemented. V3-V6 not started. Full V1-V6 roadmap: roughly **40-45% by effort** (V1 was the largest single chunk of the total build, so finishing it moved this more than V2 alone will).
 
 ## V1 vertical slice
 Status: `[x]` done and verified, `[~]` partly done, `[ ]` not started
