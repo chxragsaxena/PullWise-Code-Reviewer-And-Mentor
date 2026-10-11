@@ -1,0 +1,41 @@
+id: solid
+name: SOLID
+version: 1
+languages: [go]
+description: >
+  The five SOLID principles: code structured so it can change in one place
+  without becoming fragile elsewhere. These are judgment calls, not syntax
+  patterns, so every check here is AI-reviewed — the model must point to the
+  actual responsibilities, call sites or types involved, not just assert a
+  violation.
+
+checks:
+  - id: single-responsibility
+    title: Type or function has more than one reason to change
+    kind: ai
+    severity: high
+    lesson: srp
+
+  - id: open-closed
+    title: Adding a new case requires editing existing logic instead of extending it
+    kind: ai
+    severity: medium
+    lesson: ocp
+
+  - id: liskov-substitution
+    title: A subtype narrows what its base type promises
+    kind: ai
+    severity: high
+    lesson: lsp
+
+  - id: interface-segregation
+    title: Interface is larger than its consumers need
+    kind: ai
+    severity: suggestion
+    lesson: isp
+
+  - id: dependency-inversion
+    title: High-level code depends on a concrete low-level implementation
+    kind: ai
+    severity: medium
+    lesson: dip

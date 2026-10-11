@@ -1,0 +1,45 @@
+id: rest
+name: REST API Design
+version: 1
+languages: [go]
+description: >
+  Consistency and correctness in HTTP API design: methods, status codes,
+  URL shape, idempotency, error responses and avoiding redundant calls. Like
+  solid, these are design judgments — every check here is AI-reviewed.
+
+checks:
+  - id: http-method-mismatch
+    title: HTTP method doesn't match what the handler actually does
+    kind: ai
+    severity: medium
+    lesson: http-methods
+
+  - id: incorrect-status-code
+    title: Response status code doesn't match the real outcome
+    kind: ai
+    severity: medium
+    lesson: status-codes
+
+  - id: non-resource-oriented-url
+    title: URL encodes an action instead of naming a resource
+    kind: ai
+    severity: suggestion
+    lesson: resource-urls
+
+  - id: missing-idempotency
+    title: A repeatable request isn't safe to repeat
+    kind: ai
+    severity: high
+    lesson: idempotency
+
+  - id: inconsistent-error-response
+    title: Error response shape is inconsistent with the rest of the API
+    kind: ai
+    severity: medium
+    lesson: error-responses
+
+  - id: unnecessary-network-call
+    title: Handler makes an avoidable or redundant network/database call
+    kind: ai
+    severity: medium
+    lesson: network-calls

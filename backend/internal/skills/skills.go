@@ -33,6 +33,9 @@ const (
 	AnalyzerSemgrep    Analyzer = "semgrep"
 	AnalyzerTreeSitter Analyzer = "treesitter"
 	AnalyzerMetric     Analyzer = "metric"
+	// AnalyzerGoAST is internal/analyzer/goast: Go's own go/parser + go/ast,
+	// used instead of Tree-sitter for Go specifically (see docs/TRACKER.md).
+	AnalyzerGoAST Analyzer = "goast"
 )
 
 // Check is one thing a skill looks for.
@@ -183,7 +186,7 @@ func (s Skill) validateCheck(c Check) error {
 	switch c.Kind {
 	case KindDeterministic:
 		switch c.Analyzer {
-		case AnalyzerSemgrep, AnalyzerTreeSitter:
+		case AnalyzerSemgrep, AnalyzerTreeSitter, AnalyzerGoAST:
 		case AnalyzerMetric:
 			if c.Threshold < 1 {
 				return errors.New("metric checks need a threshold")

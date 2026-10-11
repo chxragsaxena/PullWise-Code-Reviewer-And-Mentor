@@ -5,32 +5,33 @@ name: Go
 version: 1
 languages: [go]          # skill is selected only if the PR changes files in these languages
 description: >
-  Idiomatic Go: error handling, context propagation, concurrency safety and
-  interface design.
+  Idiomatic Go: error handling, context propagation and concurrency safety.
+  Interface design lives in the solid skill (Interface Segregation), since
+  it's the same question either way.
 
 # kind: deterministic -> computed by an analyzer, confidence is always 1.0
 # kind: ai            -> needs judgment; the LLM must cite evidence from the code
-# analyzer (deterministic only): semgrep | treesitter | metric
+# analyzer (deterministic only): goast | semgrep | treesitter | metric
 # lesson: file name (without .md) in lessons/
 checks:
   - id: ignored-error
     title: Error return value is ignored
     kind: deterministic
-    analyzer: semgrep
+    analyzer: goast
     severity: high
     lesson: error-handling
 
   - id: context-not-first
     title: context.Context is not the first parameter
     kind: deterministic
-    analyzer: treesitter
+    analyzer: goast
     severity: medium
     lesson: context
 
   - id: http-call-without-context
     title: HTTP or database call made without a context
     kind: deterministic
-    analyzer: semgrep
+    analyzer: goast
     severity: medium
     lesson: context
 
@@ -47,9 +48,3 @@ checks:
     kind: ai
     severity: high
     lesson: concurrency
-
-  - id: interface-too-large
-    title: Interface is larger than its consumers need
-    kind: ai
-    severity: suggestion
-    lesson: interfaces
