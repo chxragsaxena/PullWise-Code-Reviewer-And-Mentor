@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/lang"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
@@ -116,12 +117,78 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 		}
 		raw = append(raw, found...)
 	}
+	findings := s.normalize(raw, selected)
+
+	if s.aiProvider != nil && hasAICheck(selected) {
+		if err := s.transition(ctx, id, review.StatusReviewing, "Reviewing in context"); err != nil {
+			return nil, "", err
+		}
+		aiRaw := s.runAI(ctx, selected, inputs)
+		findings = append(findings, s.normalizeAI(aiRaw, selected)...)
+	}
+	sortFindings(findings)
 
 	closing := "Review complete"
 	if skipped > 0 {
 		closing = fmt.Sprintf("Review complete. Analyzed %d of %d source files; the rest were skipped", len(analyzed), len(reviewable))
 	}
-	return s.normalize(raw, selected), closing, nil
+	return findings, closing, nil
+}
+
+// hasAICheck reports whether any selected skill defines a kind: ai check.
+func hasAICheck(selected map[string]skills.Skill) bool {
+	for _, sk := range selected {
+		for _, c := range sk.Checks {
+			if c.Kind == skills.KindAI {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// runAI evaluates every selected skill's kind: ai checks against the files
+// that skill applies to. A provider error is logged and treated as "this
+// skill's AI pass found nothing" rather than failing the review: the
+// deterministic findings are already complete and valuable on their own, and
+// one flaky or rate-limited call should not throw them away.
+func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, files []review.ChangedFile) []review.Finding {
+	var out []review.Finding
+	for _, sk := range selected {
+		var checks []skills.Check
+		for _, c := range sk.Checks {
+			if c.Kind == skills.KindAI {
+				checks = append(checks, c)
+			}
+		}
+		if len(checks) == 0 {
+			continue
+		}
+
+		var skillFiles []review.ChangedFile
+		for _, f := range files {
+			if sk.AppliesTo(f.Language) {
+				skillFiles = append(skillFiles, f)
+			}
+		}
+		if len(skillFiles) == 0 {
+			continue
+		}
+
+		found, err := s.aiProvider.Review(ctx, ai.ReviewInput{Skill: sk, Checks: checks, Files: skillFiles})
+		if err != nil {
+			slog.Warn("ai review pass failed; continuing with deterministic findings only", "skill", sk.ID, "error", err)
+			continue
+		}
+		for _, f := range found {
+			out = append(out, review.Finding{
+				SkillID: sk.ID, CheckID: f.CheckID, File: f.File, Line: f.Line, EndLine: f.EndLine,
+				Evidence: f.Evidence, Found: f.Found, Why: f.Why, Improvement: f.Improvement,
+				Confidence: f.Confidence,
+			})
+		}
+	}
+	return out
 }
 
 // reviewableFiles keeps files in a language we review that still exist after the PR.
@@ -237,9 +304,45 @@ func (s *Service) normalize(raw []review.Finding, selected map[string]skills.Ski
 		}
 		out = append(out, f)
 	}
+	return out
+}
 
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
+// normalizeAI is normalize's counterpart for the AI pass: it requires a
+// kind: ai check (never a deterministic one — an analyzer output claiming an
+// AI check, or vice versa, indicates a bug and is dropped) and keeps the
+// model's own confidence instead of forcing 1.0.
+func (s *Service) normalizeAI(raw []review.Finding, selected map[string]skills.Skill) []review.Finding {
+	var out []review.Finding
+	for _, f := range raw {
+		sk, ok := selected[f.SkillID]
+		if !ok {
+			slog.Warn("dropping ai finding for a skill that does not apply", "skill", f.SkillID, "check", f.CheckID)
+			continue
+		}
+		check, ok := sk.Check(f.CheckID)
+		if !ok || check.Kind != skills.KindAI {
+			slog.Warn("dropping ai finding for an unknown or non-ai check", "skill", f.SkillID, "check", f.CheckID)
+			continue
+		}
+
+		f.Source = review.SourceAI
+		f.Severity = check.Severity
+		f.Lesson = check.Lesson
+		f = s.enrich(f)
+		if err := f.Validate(); err != nil {
+			slog.Warn("dropping invalid ai finding", "error", err)
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+// sortFindings orders a review's combined findings: most severe first, then
+// by file and line, stably so equal-ranked findings keep a predictable order.
+func sortFindings(findings []review.Finding) {
+	sort.SliceStable(findings, func(i, j int) bool {
+		a, b := findings[i], findings[j]
 		if ra, rb := severityRank(a.Severity), severityRank(b.Severity); ra != rb {
 			return ra < rb
 		}
@@ -248,7 +351,6 @@ func (s *Service) normalize(raw []review.Finding, selected map[string]skills.Ski
 		}
 		return a.Line < b.Line
 	})
-	return out
 }
 
 func severityRank(s review.Severity) int {

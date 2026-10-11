@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
@@ -50,6 +51,10 @@ type PullRequestSource interface {
 type Config struct {
 	Skills    []skills.Skill
 	Analyzers []review.StaticAnalyzer
+	// AIProvider evaluates each selected skill's kind: ai checks. Nil disables
+	// the AI pass entirely: reviews go straight from analyzing to completed,
+	// exactly as before this existed.
+	AIProvider ai.Provider
 
 	// MaxConcurrent is how many reviews run at once, i.e. the number of workers
 	// (default 2).
@@ -82,12 +87,13 @@ func (c Config) withDefaults() Config {
 
 // Service coordinates reviews. It is safe for concurrent use.
 type Service struct {
-	store    ReviewStore
-	recorder ReviewRecorder
-	source   PullRequestSource
-	broker   *Broker
-	cfg      Config
-	skills   map[string]skills.Skill
+	store      ReviewStore
+	recorder   ReviewRecorder
+	source     PullRequestSource
+	broker     *Broker
+	cfg        Config
+	skills     map[string]skills.Skill
+	aiProvider ai.Provider
 
 	jobs    chan job // FIFO queue feeding the workers
 	baseCtx context.Context
@@ -114,15 +120,16 @@ func New(store ReviewStore, recorder ReviewRecorder, source PullRequestSource, c
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Service{
-		store:    store,
-		recorder: recorder,
-		source:   source,
-		broker:   NewBroker(),
-		cfg:      cfg,
-		skills:   byID,
-		jobs:     make(chan job, cfg.MaxPending),
-		baseCtx:  ctx,
-		cancel:   cancel,
+		store:      store,
+		recorder:   recorder,
+		source:     source,
+		broker:     NewBroker(),
+		cfg:        cfg,
+		skills:     byID,
+		aiProvider: cfg.AIProvider,
+		jobs:       make(chan job, cfg.MaxPending),
+		baseCtx:    ctx,
+		cancel:     cancel,
 	}
 
 	s.wg.Add(cfg.MaxConcurrent)

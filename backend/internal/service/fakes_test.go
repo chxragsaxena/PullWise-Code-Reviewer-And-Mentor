@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
@@ -178,6 +179,26 @@ func (s *fakeSource) FileContent(ctx context.Context, _ github.PullRequestRef, p
 	return s.content(ctx, path)
 }
 
+// fakeAI is a scriptable ai.Provider.
+type fakeAI struct {
+	mu    sync.Mutex
+	calls []ai.ReviewInput
+	fn    func(ai.ReviewInput) ([]ai.Finding, error)
+}
+
+func (f *fakeAI) Review(_ context.Context, input ai.ReviewInput) ([]ai.Finding, error) {
+	f.mu.Lock()
+	f.calls = append(f.calls, input)
+	f.mu.Unlock()
+	return f.fn(input)
+}
+
+func (f *fakeAI) callCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.calls)
+}
+
 // analyzerFunc adapts a function to review.StaticAnalyzer.
 type analyzerFunc func(ctx context.Context, in review.AnalysisInput) ([]review.Finding, error)
 
@@ -212,6 +233,34 @@ checks:
     lesson: errors
 `
 
+const onlyDeterministicSkillYAML = `
+id: go
+name: Go
+version: 1
+languages: [go]
+checks:
+  - id: ignored-error
+    title: Error return value is ignored
+    kind: deterministic
+    analyzer: semgrep
+    severity: high
+    lesson: errors
+`
+
+// onlyDeterministicSkill is the "go" skill with its ai check removed, for
+// tests that need hasAICheck to be false.
+func onlyDeterministicSkill(t *testing.T) []skills.Skill {
+	t.Helper()
+	loaded, err := skills.Load(fstest.MapFS{
+		"go/skill.yaml":        {Data: []byte(onlyDeterministicSkillYAML)},
+		"go/lessons/errors.md": {Data: []byte("# Errors\n\nHandle them.")},
+	})
+	if err != nil {
+		t.Fatalf("load skill fixture: %v", err)
+	}
+	return loaded
+}
+
 func testSkills(t *testing.T) []skills.Skill {
 	t.Helper()
 	loaded, err := skills.Load(fstest.MapFS{
@@ -229,6 +278,21 @@ func newService(t *testing.T, store *fakeStore, src *fakeSource, cfg Config, ana
 	t.Helper()
 	cfg.Skills = testSkills(t)
 	cfg.Analyzers = analyzers
+	svc := New(store, store, src, cfg)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = svc.Close(ctx)
+	})
+	return svc
+}
+
+// newServiceWithAI is newService plus a scriptable AI provider.
+func newServiceWithAI(t *testing.T, store *fakeStore, src *fakeSource, cfg Config, aiProvider ai.Provider, analyzers ...review.StaticAnalyzer) *Service {
+	t.Helper()
+	cfg.Skills = testSkills(t)
+	cfg.Analyzers = analyzers
+	cfg.AIProvider = aiProvider
 	svc := New(store, store, src, cfg)
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
