@@ -1,0 +1,52 @@
+id: typescript
+name: TypeScript
+version: 1
+languages: [typescript]
+description: >
+  TypeScript-specific correctness: type safety, promise handling and
+  request cancellation. Parsed with tree-sitter, since Go's own parser
+  can't read TypeScript (see internal/analyzer/tsast).
+
+checks:
+  - id: loose-equality
+    title: Loose equality (==/!=) instead of strict (===/!==)
+    kind: deterministic
+    analyzer: tsast
+    severity: medium
+    lesson: loose-equality
+
+  - id: any-type
+    title: Explicit `any` type disables type checking
+    kind: deterministic
+    analyzer: tsast
+    severity: medium
+    lesson: any-type
+
+  - id: console-log-left-in
+    title: console.log left in the code
+    kind: deterministic
+    analyzer: tsast
+    severity: suggestion
+    lesson: console-log
+
+  - id: unhandled-promise
+    title: A .then() chain has no .catch()
+    kind: deterministic
+    analyzer: tsast
+    severity: high
+    lesson: unhandled-promise
+
+  - id: fetch-without-abort-signal
+    title: fetch() call has no way to be cancelled
+    kind: deterministic
+    analyzer: tsast
+    severity: medium
+    lesson: abort-signal
+
+  - id: high-complexity
+    title: Function has high cyclomatic complexity
+    kind: deterministic
+    analyzer: tsast
+    threshold: 15
+    severity: medium
+    lesson: high-complexity

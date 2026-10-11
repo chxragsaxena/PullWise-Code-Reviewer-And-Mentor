@@ -14,6 +14,7 @@ import (
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/tsast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
@@ -88,9 +89,12 @@ func run() error {
 		slog.Warn("GITHUB_TOKEN is not set: GitHub allows only 60 API requests per hour without one")
 	}
 
-	// go/ast covers the Go skill's deterministic checks. Tree-sitter is reserved
-	// for TypeScript and Semgrep for pattern-based checks, neither built yet.
-	analyzers := []review.StaticAnalyzer{goast.New(goast.Config{ComplexityThreshold: goComplexityThreshold(loadedSkills)})}
+	// go/ast covers the Go skill's deterministic checks; tree-sitter covers
+	// TypeScript's (Semgrep, for pattern-based checks, isn't built yet).
+	analyzers := []review.StaticAnalyzer{
+		goast.New(goast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "go")}),
+		tsast.New(tsast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "typescript")}),
+	}
 
 	// The AI pass (kind: ai checks) runs on Groq, free and fast; see
 	// internal/ai/groq.go for why. Nil disables it entirely if no key is set.
@@ -159,12 +163,12 @@ func run() error {
 	return nil
 }
 
-// goComplexityThreshold reads the go skill's high-complexity threshold from
-// its skill.yaml, so the analyzer and the skill definition cannot drift apart.
+// complexityThreshold reads a skill's high-complexity threshold from its
+// skill.yaml, so the analyzer and the skill definition cannot drift apart.
 // It returns 0 (the analyzer's own default) if the skill or check is missing.
-func goComplexityThreshold(loaded []skills.Skill) int {
+func complexityThreshold(loaded []skills.Skill, skillID string) int {
 	for _, sk := range loaded {
-		if sk.ID != "go" {
+		if sk.ID != skillID {
 			continue
 		}
 		if check, ok := sk.Check("high-complexity"); ok {
