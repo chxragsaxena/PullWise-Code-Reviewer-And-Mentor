@@ -19,6 +19,9 @@ type Config struct {
 	DatabaseURL string
 	// GitHubToken is optional; it raises GitHub's API rate limit.
 	GitHubToken string
+	// GroqAPIKey enables the AI review pass (kind: ai checks) via Groq. Empty
+	// disables it — reviews stay deterministic-only, exactly as before it existed.
+	GroqAPIKey string
 
 	// MaxConcurrentReviews is how many reviews are processed at once.
 	MaxConcurrentReviews int
@@ -42,6 +45,7 @@ func Load() (Config, error) {
 		SkillsDir:   getenv("SKILLS_DIR", "skills"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		GitHubToken: os.Getenv("GITHUB_TOKEN"),
+		GroqAPIKey:  os.Getenv("GROQ_API_KEY"),
 	}
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL is required (see .env.example)"))

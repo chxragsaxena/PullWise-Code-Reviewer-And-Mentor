@@ -12,7 +12,7 @@ import (
 func clearEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
-		"ADDR", "SKILLS_DIR", "DATABASE_URL", "GITHUB_TOKEN", "MAX_CONCURRENT_REVIEWS",
+		"ADDR", "SKILLS_DIR", "DATABASE_URL", "GITHUB_TOKEN", "GROQ_API_KEY", "MAX_CONCURRENT_REVIEWS",
 		"MAX_QUEUED_REVIEWS", "CREATE_RATE_PER_MINUTE", "CREATE_BURST", "REVIEW_TIMEOUT",
 	} {
 		t.Setenv(key, "")
@@ -43,6 +43,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("ADDR", ":9090")
 	t.Setenv("SKILLS_DIR", "/opt/skills")
 	t.Setenv("GITHUB_TOKEN", "ghp_x")
+	t.Setenv("GROQ_API_KEY", "gsk_x")
 	t.Setenv("MAX_CONCURRENT_REVIEWS", "4")
 	t.Setenv("MAX_QUEUED_REVIEWS", "8")
 	t.Setenv("CREATE_RATE_PER_MINUTE", "0") // turns the limit off
@@ -54,7 +55,7 @@ func TestLoadFromEnv(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{
-		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x",
+		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x", GroqAPIKey: "gsk_x",
 		MaxConcurrentReviews: 4, MaxQueuedReviews: 8, ReviewTimeout: 90 * time.Second,
 		CreateRatePerMinute: 0, CreateBurst: 3,
 	}

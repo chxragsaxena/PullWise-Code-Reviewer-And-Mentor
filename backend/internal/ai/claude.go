@@ -14,69 +14,21 @@ import (
 // specifically, which is why this deviates from Opus, the usual default.
 const DefaultModel = "claude-sonnet-5"
 
-const reportToolName = "report_findings"
-
-// maxTokens bounds the response. A review's findings list is a handful of
-// short entries, not a long document, so this is generous rather than tight.
-const maxTokens = 8000
-
-// reportSchema is the input_schema of the report_findings tool. Every object
-// sets additionalProperties: false and lists every field as required, per the
-// Claude API's rules for strict tool use — see the Common Pitfalls note on
-// ToolInputSchemaParam.ExtraFields for why the top-level flag needs that field
-// specifically rather than a struct field.
-var findingProperties = map[string]any{
-	"checkId":     map[string]any{"type": "string", "description": "The checkId this finding belongs to, exactly as given above."},
-	"file":        map[string]any{"type": "string"},
-	"line":        map[string]any{"type": "integer", "description": "1-based line number, or 0 if the finding applies to the whole file."},
-	"endLine":     map[string]any{"type": "integer", "description": "0 for a single line or the whole file."},
-	"evidence":    map[string]any{"type": "string", "description": "The exact code that shows the problem."},
-	"found":       map[string]any{"type": "string"},
-	"why":         map[string]any{"type": "string"},
-	"improvement": map[string]any{"type": "string"},
-	"confidence":  map[string]any{"type": "number", "description": "Your confidence, 0 to 1, that this is a real, worthwhile finding."},
-}
-
-var findingRequired = []string{"checkId", "file", "line", "endLine", "evidence", "found", "why", "improvement", "confidence"}
-
-// reportFindingsTool builds the tool definition. It's a function, not a
-// package var, so the ExtraFields map is never shared/mutated across calls.
+// reportFindingsTool builds the tool definition from the shared schema
+// (schema.go). It's a function, not a package var, so the ExtraFields map is
+// never shared/mutated across calls.
 func reportFindingsTool() anthropic.ToolParam {
+	schema := findingsObjectSchema()
 	return anthropic.ToolParam{
 		Name:        reportToolName,
 		Description: anthropic.String("Report the issues you found in this pull request, one per finding."),
 		Strict:      anthropic.Bool(true),
 		InputSchema: anthropic.ToolInputSchemaParam{
-			Properties: map[string]any{
-				"findings": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type":                 "object",
-						"properties":           findingProperties,
-						"required":             findingRequired,
-						"additionalProperties": false,
-					},
-				},
-			},
+			Properties:  schema["properties"],
 			Required:    []string{"findings"},
 			ExtraFields: map[string]any{"additionalProperties": false},
 		},
 	}
-}
-
-// toolInput is the shape the model's tool call is parsed into.
-type toolInput struct {
-	Findings []struct {
-		CheckID     string  `json:"checkId"`
-		File        string  `json:"file"`
-		Line        int     `json:"line"`
-		EndLine     int     `json:"endLine"`
-		Evidence    string  `json:"evidence"`
-		Found       string  `json:"found"`
-		Why         string  `json:"why"`
-		Improvement string  `json:"improvement"`
-		Confidence  float64 `json:"confidence"`
-	} `json:"findings"`
 }
 
 // ClaudeProvider implements Provider using the Anthropic Messages API.
@@ -162,24 +114,6 @@ func (p *ClaudeProvider) Review(ctx context.Context, input ReviewInput) ([]Findi
 		return toFindings(parsed), nil
 	}
 	return nil, fmt.Errorf("claude review (skill %s): response had no %s tool call", input.Skill.ID, reportToolName)
-}
-
-func toFindings(parsed toolInput) []Finding {
-	out := make([]Finding, 0, len(parsed.Findings))
-	for _, f := range parsed.Findings {
-		confidence := f.Confidence
-		if confidence < 0 {
-			confidence = 0
-		} else if confidence > 1 {
-			confidence = 1
-		}
-		out = append(out, Finding{
-			CheckID: f.CheckID, File: f.File, Line: f.Line, EndLine: f.EndLine,
-			Evidence: f.Evidence, Found: f.Found, Why: f.Why, Improvement: f.Improvement,
-			Confidence: confidence,
-		})
-	}
-	return out
 }
 
 func toolPtr(t anthropic.ToolParam) *anthropic.ToolParam { return &t }

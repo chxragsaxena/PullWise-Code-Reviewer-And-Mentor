@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
@@ -91,9 +92,19 @@ func run() error {
 	// for TypeScript and Semgrep for pattern-based checks, neither built yet.
 	analyzers := []review.StaticAnalyzer{goast.New(goast.Config{ComplexityThreshold: goComplexityThreshold(loadedSkills)})}
 
+	// The AI pass (kind: ai checks) runs on Groq, free and fast; see
+	// internal/ai/groq.go for why. Nil disables it entirely if no key is set.
+	var aiProvider ai.Provider
+	if cfg.GroqAPIKey != "" {
+		aiProvider = ai.NewGroqProvider(cfg.GroqAPIKey)
+	} else {
+		slog.Warn("GROQ_API_KEY is not set: the AI review pass is disabled, reviews will be deterministic-only")
+	}
+
 	svc := service.New(st, st, github.NewClient(opts...), service.Config{
 		Skills:        loadedSkills,
 		Analyzers:     analyzers,
+		AIProvider:    aiProvider,
 		MaxConcurrent: cfg.MaxConcurrentReviews,
 		MaxPending:    cfg.MaxQueuedReviews,
 		ReviewTimeout: cfg.ReviewTimeout,
