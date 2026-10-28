@@ -22,6 +22,9 @@ type Config struct {
 	// GroqAPIKey enables the AI review pass (kind: ai checks) via Groq. Empty
 	// disables it — reviews stay deterministic-only, exactly as before it existed.
 	GroqAPIKey string
+	// CohereAPIKey enables text embeddings for the repository knowledge base
+	// (V4). Empty disables it.
+	CohereAPIKey string
 
 	// GitHub OAuth (login). Empty ClientID disables login entirely — every
 	// /auth/* route then degrades to "not configured" / "not logged in".
@@ -60,6 +63,8 @@ func Load() (Config, error) {
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		GitHubToken: os.Getenv("GITHUB_TOKEN"),
 		GroqAPIKey:  os.Getenv("GROQ_API_KEY"),
+
+		CohereAPIKey: os.Getenv("COHERE_API_KEY"),
 
 		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
 		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
