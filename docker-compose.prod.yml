@@ -11,6 +11,10 @@
 # GitHub OAuth App's callback URL. Put HTTPS (a reverse proxy or your host's TLS)
 # in front of the "web" service.
 
+# Own project name, so this stack (containers, network, "pgdata" volume) never
+# collides with the development compose file's database.
+name: pullwise
+
 services:
   db:
     image: postgres:18
