@@ -84,10 +84,16 @@ func (s Skill) Check(id string) (Check, bool) {
 	return Check{}, false
 }
 
+// AnyLanguage, listed in a skill's languages, makes the skill apply to every
+// source language the service recognises (see package lang). Use it for
+// judgment-based AI skills (design principles) that aren't tied to one
+// language's syntax.
+const AnyLanguage = "*"
+
 // AppliesTo reports whether the skill covers the given language.
 func (s Skill) AppliesTo(language string) bool {
 	for _, l := range s.Languages {
-		if l == language {
+		if l == AnyLanguage || l == language {
 			return true
 		}
 	}

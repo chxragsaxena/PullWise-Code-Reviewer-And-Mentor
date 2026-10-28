@@ -57,6 +57,28 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
+func TestAppliesTo(t *testing.T) {
+	tests := []struct {
+		name      string
+		languages []string
+		language  string
+		want      bool
+	}{
+		{"listed language", []string{"go"}, "go", true},
+		{"unlisted language", []string{"go"}, "python", false},
+		{"one of several", []string{"go", "typescript"}, "typescript", true},
+		{"wildcard matches a language the skill never named", []string{AnyLanguage}, "python", true},
+		{"wildcard matches the others too", []string{AnyLanguage}, "go", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (Skill{Languages: tt.languages}).AppliesTo(tt.language); got != tt.want {
+				t.Fatalf("AppliesTo(%q) with %v = %v, want %v", tt.language, tt.languages, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadSkipsDirectoriesWithoutSkillFile(t *testing.T) {
 	fsys := demoFS(validYAML)
 	fsys["notes/readme.md"] = &fstest.MapFile{Data: []byte("hi")}

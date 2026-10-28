@@ -1,7 +1,7 @@
 id: solid
 name: SOLID
 version: 1
-languages: [go]
+languages: ["*"]          # design principles, not syntax: applies to any language we recognise
 description: >
   The five SOLID principles: code structured so it can change in one place
   without becoming fragile elsewhere. These are judgment calls, not syntax

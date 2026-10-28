@@ -1,7 +1,7 @@
 id: rest
 name: REST API Design
 version: 1
-languages: [go]
+languages: ["*"]          # API design, not syntax: applies to any language we recognise
 description: >
   Consistency and correctness in HTTP API design: methods, status codes,
   URL shape, idempotency, error responses and avoiding redundant calls. Like
