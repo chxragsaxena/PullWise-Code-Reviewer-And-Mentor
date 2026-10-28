@@ -1,0 +1,54 @@
+# Whole app in containers: database + Go backend + web UI (nginx).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Then open http://localhost:8080 (or WEB_PORT). Reads .env next to this file
+# (copy .env.example): POSTGRES_PASSWORD is required; GROQ_API_KEY, GITHUB_TOKEN,
+# COHERE_API_KEY and the GITHUB_OAUTH_* / SESSION_SECRET settings are optional.
+#
+# Deploying behind a real domain: set PUBLIC_URL (e.g. https://pullwise.example.com)
+# and SECURE_COOKIES=true, and use that same URL + /auth/github/callback as the
+# GitHub OAuth App's callback URL. Put HTTPS (a reverse proxy or your host's TLS)
+# in front of the "web" service.
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pullwise}
+      POSTGRES_DB: ${POSTGRES_DB:-pullwise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # These override .env: inside the network the database is "db", not localhost.
+      # (A password with special characters must be URL-encoded here.)
+      DATABASE_URL: postgres://${POSTGRES_USER:-pullwise}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pullwise}?sslmode=disable
+      ADDR: ":8080"
+      FRONTEND_URL: ${PUBLIC_URL:-http://localhost:8080}
+      GITHUB_OAUTH_REDIRECT_URL: ${PUBLIC_URL:-http://localhost:8080}/auth/github/callback
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
