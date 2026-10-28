@@ -13,7 +13,7 @@ checks:
   - id: single-responsibility
     title: Type or function has more than one reason to change
     kind: ai
-    severity: high
+    severity: medium
     lesson: srp
 
   - id: open-closed
