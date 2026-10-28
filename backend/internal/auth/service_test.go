@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -294,6 +295,127 @@ func TestUserGitHubTokenRefusesAnExpiredToken(t *testing.T) {
 				t.Fatal("an expired token must not be returned")
 			}
 		})
+	}
+}
+
+// refreshServer answers GitHub's token endpoint for refresh_token grants and
+// counts how many times it was asked.
+func refreshingService(t *testing.T, respond func(refreshToken string) (int, string)) (*Service, *fakeStore, *int32) {
+	t.Helper()
+	var calls int32
+	tokenResp := func(r *http.Request) (int, string) {
+		_ = r.ParseForm()
+		if r.PostForm.Get("grant_type") != "refresh_token" || r.PostForm.Get("client_secret") != "secret" {
+			t.Errorf("unexpected token request: %v", r.PostForm)
+		}
+		atomic.AddInt32(&calls, 1)
+		return respond(r.PostForm.Get("refresh_token"))
+	}
+	svc, store := newTestService(t, tokenResp, nil)
+	return svc, store, &calls
+}
+
+func storeTokens(t *testing.T, svc *Service, store *fakeStore, access, refresh string, expiresAt time.Time) {
+	t.Helper()
+	a, err := svc.crypt.Encrypt(access)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := svc.crypt.Encrypt(refresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.tokens["1"] = Tokens{AccessEnc: a, RefreshEnc: r, ExpiresAt: &expiresAt}
+}
+
+func TestUserGitHubTokenRefreshesAnExpiredTokenAndSavesTheRotatedPair(t *testing.T) {
+	svc, store, calls := refreshingService(t, func(refresh string) (int, string) {
+		if refresh != "ghr_old" {
+			t.Errorf("refreshed with %q, want the stored refresh token", refresh)
+		}
+		return 200, `{"access_token":"ghu_new","refresh_token":"ghr_new","expires_in":28800}`
+	})
+	storeTokens(t, svc, store, "ghu_old", "ghr_old", time.Now().Add(-time.Hour))
+
+	got, err := svc.UserGitHubToken(context.Background(), "1")
+	if err != nil || got != "ghu_new" {
+		t.Fatalf("UserGitHubToken = %q, %v; want the refreshed token", got, err)
+	}
+
+	saved := store.tokens["1"]
+	access, _ := svc.crypt.Decrypt(saved.AccessEnc)
+	refresh, _ := svc.crypt.Decrypt(saved.RefreshEnc)
+	if access != "ghu_new" || refresh != "ghr_new" {
+		t.Fatalf("saved access=%q refresh=%q; the rotated refresh token must be kept", access, refresh)
+	}
+	if saved.ExpiresAt == nil || !saved.ExpiresAt.After(time.Now().Add(7*time.Hour)) {
+		t.Fatalf("saved expiry = %v, want about 8h from now", saved.ExpiresAt)
+	}
+
+	// The next call uses the saved token without another refresh.
+	if again, err := svc.UserGitHubToken(context.Background(), "1"); err != nil || again != "ghu_new" {
+		t.Fatalf("second call = %q, %v", again, err)
+	}
+	if n := atomic.LoadInt32(calls); n != 1 {
+		t.Fatalf("GitHub was asked to refresh %d times, want 1", n)
+	}
+}
+
+func TestUserGitHubTokenRefreshesJustBeforeExpiry(t *testing.T) {
+	svc, store, calls := refreshingService(t, func(string) (int, string) {
+		return 200, `{"access_token":"ghu_new","refresh_token":"ghr_new","expires_in":28800}`
+	})
+	storeTokens(t, svc, store, "ghu_old", "ghr_old", time.Now().Add(20*time.Second)) // inside the skew
+
+	if got, err := svc.UserGitHubToken(context.Background(), "1"); err != nil || got != "ghu_new" {
+		t.Fatalf("UserGitHubToken = %q, %v", got, err)
+	}
+	if atomic.LoadInt32(calls) != 1 {
+		t.Fatal("a token about to expire should be refreshed")
+	}
+}
+
+func TestUserGitHubTokenReportsExpiredWhenGitHubRefusesTheRefresh(t *testing.T) {
+	svc, store, _ := refreshingService(t, func(string) (int, string) {
+		return 200, `{"error":"bad_refresh_token","error_description":"The refresh token passed is incorrect or expired."}`
+	})
+	storeTokens(t, svc, store, "ghu_old", "ghr_old", time.Now().Add(-time.Hour))
+
+	got, err := svc.UserGitHubToken(context.Background(), "1")
+	if !errors.Is(err, ErrTokenExpired) || got != "" {
+		t.Fatalf("got %q, %v; want ErrTokenExpired and no token", got, err)
+	}
+	// The old tokens are left alone so nothing is lost by a failed attempt.
+	if access, _ := svc.crypt.Decrypt(store.tokens["1"].AccessEnc); access != "ghu_old" {
+		t.Fatal("a failed refresh must not overwrite the stored tokens")
+	}
+}
+
+func TestConcurrentRequestsRefreshOnlyOnce(t *testing.T) {
+	svc, store, calls := refreshingService(t, func(string) (int, string) {
+		time.Sleep(50 * time.Millisecond) // widen the race window
+		return 200, `{"access_token":"ghu_new","refresh_token":"ghr_new","expires_in":28800}`
+	})
+	storeTokens(t, svc, store, "ghu_old", "ghr_old", time.Now().Add(-time.Hour))
+
+	var wg sync.WaitGroup
+	results := make([]string, 8)
+	for i := range results {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i], _ = svc.UserGitHubToken(context.Background(), "1")
+		}()
+	}
+	wg.Wait()
+
+	if n := atomic.LoadInt32(calls); n != 1 {
+		t.Fatalf("GitHub was asked to refresh %d times, want 1 (refresh tokens are single-use)", n)
+	}
+	for i, got := range results {
+		if got != "ghu_new" {
+			t.Errorf("request %d got %q, want the refreshed token", i, got)
+		}
 	}
 }
 

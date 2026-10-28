@@ -93,12 +93,29 @@ type Token struct {
 
 // Exchange trades an authorization code (from the callback) for a token.
 func (o *OAuth) Exchange(ctx context.Context, code string) (Token, error) {
-	form := url.Values{
+	return o.requestToken(ctx, url.Values{
 		"client_id":     {o.clientID},
 		"client_secret": {o.clientSecret},
 		"code":          {code},
 		"redirect_uri":  {o.redirectURL},
-	}
+	})
+}
+
+// Refresh trades a refresh token for a new access token. GitHub rotates the
+// refresh token: the one passed in stops working, so the caller must save the
+// returned one.
+func (o *OAuth) Refresh(ctx context.Context, refreshToken string) (Token, error) {
+	return o.requestToken(ctx, url.Values{
+		"client_id":     {o.clientID},
+		"client_secret": {o.clientSecret},
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	})
+}
+
+// requestToken posts to GitHub's token endpoint, which reports failures as a
+// 200 response with an "error" field.
+func (o *OAuth) requestToken(ctx context.Context, form url.Values) (Token, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return Token{}, fmt.Errorf("build token request: %w", err)
