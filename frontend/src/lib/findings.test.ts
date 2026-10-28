@@ -56,8 +56,33 @@ describe("findings helpers", () => {
     expect(filterFindings(sample, { severities: [], skillId: "security" }).map((f) => f.id)).toEqual(["2"]);
   });
 
-  it("lists each skill once, sorted by name", () => {
-    expect(uniqueSkills(sample).map((s) => s.name)).toEqual(["Go", "Security", "SOLID"]);
+  it("lists each skill once with its finding count", () => {
+    expect(uniqueSkills(sample).map((s) => [s.name, s.count])).toEqual([
+      ["Go", 2],
+      ["Security", 1],
+      ["SOLID", 1],
+    ]);
+  });
+
+  it("puts the language skill first, then REST, then SOLID, whatever order findings arrive in", () => {
+    const mixed = [
+      finding("1", "medium", "solid", "SOLID"),
+      finding("2", "medium", "rest", "REST API Design"),
+      finding("3", "medium", "typescript", "TypeScript"),
+      finding("4", "medium", "solid", "SOLID"),
+    ];
+    const skills = uniqueSkills(mixed);
+    expect(skills.map((s) => s.id)).toEqual(["typescript", "rest", "solid"]);
+    expect(skills.map((s) => s.group)).toEqual(["language", "design", "design"]);
+  });
+
+  it("orders several language skills alphabetically, ahead of the design skills", () => {
+    const skills = uniqueSkills([
+      finding("1", "medium", "rest", "REST API Design"),
+      finding("2", "medium", "typescript", "TypeScript"),
+      finding("3", "medium", "go", "Go"),
+    ]);
+    expect(skills.map((s) => s.id)).toEqual(["go", "typescript", "rest"]);
   });
 
   it("toggles severities on and off", () => {

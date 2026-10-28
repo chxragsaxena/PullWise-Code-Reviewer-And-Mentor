@@ -7,12 +7,18 @@ import {
   toggleSeverity,
   uniqueSkills,
   type FindingFilters,
+  type SkillGroup,
 } from "../lib/findings";
 import { FindingList } from "./FindingList";
 import { EmptyState } from "./PageState";
 import { PrSummary } from "./PrSummary";
 import { SeverityTiles } from "./SeverityTiles";
 import "./ReviewResults.css";
+
+const GROUPS: { group: SkillGroup; label: string }[] = [
+  { group: "language", label: "Language" },
+  { group: "design", label: "Design" },
+];
 
 export function ReviewResults({ review }: { review: Review }) {
   const [filters, setFilters] = useState<FindingFilters>(NO_FILTERS);
@@ -45,12 +51,20 @@ export function ReviewResults({ review }: { review: Review }) {
                 value={filters.skillId ?? ""}
                 onChange={(e) => setFilters((f) => ({ ...f, skillId: e.target.value || null }))}
               >
-                <option value="">All skills</option>
-                {skills.map((skill) => (
-                  <option key={skill.id} value={skill.id}>
-                    {skill.name}
-                  </option>
-                ))}
+                <option value="">All skills ({total})</option>
+                {GROUPS.map(({ group, label }) => {
+                  const options = skills.filter((s) => s.group === group);
+                  if (options.length === 0) return null;
+                  return (
+                    <optgroup key={group} label={label}>
+                      {options.map((skill) => (
+                        <option key={skill.id} value={skill.id}>
+                          {skill.name} ({skill.count})
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
             </label>
             <p className="filter-bar__count" role="status">

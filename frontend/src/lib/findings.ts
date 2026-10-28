@@ -40,10 +40,46 @@ export function groupBySeverity(findings: readonly Finding[]): SeverityGroup[] {
   })).filter((group) => group.findings.length > 0);
 }
 
-export function uniqueSkills(findings: readonly Finding[]): { id: string; name: string }[] {
-  const seen = new Map<string, string>();
-  for (const f of findings) if (!seen.has(f.skillId)) seen.set(f.skillId, f.skillName);
-  return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+export type SkillGroup = "language" | "design";
+
+export interface SkillOption {
+  id: string;
+  name: string;
+  group: SkillGroup;
+  /** Findings from this skill in the list that was passed in. */
+  count: number;
+}
+
+/**
+ * Skills that judge design rather than one language's code, in the order they
+ * are shown. Any other skill (Go, TypeScript, ...) is a language skill and is
+ * listed first. A skill's category isn't in the API, so a new design skill
+ * must be added here to be grouped with these.
+ */
+const DESIGN_SKILL_ORDER = ["rest", "solid"];
+
+/**
+ * The skills that produced findings, for a filter menu: language skills first
+ * (alphabetical), then REST, then SOLID.
+ */
+export function uniqueSkills(findings: readonly Finding[]): SkillOption[] {
+  const found = new Map<string, SkillOption>();
+  for (const f of findings) {
+    const existing = found.get(f.skillId);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      const group: SkillGroup = DESIGN_SKILL_ORDER.includes(f.skillId) ? "design" : "language";
+      found.set(f.skillId, { id: f.skillId, name: f.skillName, group, count: 1 });
+    }
+  }
+
+  const designRank = (id: string) => DESIGN_SKILL_ORDER.indexOf(id);
+  return [...found.values()].sort((a, b) => {
+    if (a.group !== b.group) return a.group === "language" ? -1 : 1;
+    if (a.group === "design") return designRank(a.id) - designRank(b.id);
+    return a.name.localeCompare(b.name);
+  });
 }
 
 export function toggleSeverity(filters: FindingFilters, severity: Severity): FindingFilters {

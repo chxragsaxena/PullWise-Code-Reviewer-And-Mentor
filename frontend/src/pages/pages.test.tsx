@@ -75,6 +75,20 @@ describe("Review page", () => {
     expect(screen.getByText(`Showing ${total} of ${total} ${total === 1 ? "finding" : "findings"}`)).toBeInTheDocument();
   });
 
+  it("offers the skill filter grouped as Language then Design, with counts", async () => {
+    const client = fastClient();
+    const review = await reviewWithCritical(client);
+    renderApp(client, `/reviews/${review.id}`);
+
+    const menu = await screen.findByRole("combobox", { name: "Skill" });
+    expect(within(menu).getByRole("option", { name: `All skills (${review.findings.length})` })).toBeInTheDocument();
+    // Language skills are listed before design skills.
+    expect(within(menu).getAllByRole("group")[0]).toHaveAttribute("label", "Language");
+    for (const option of within(menu).getAllByRole("option").slice(1)) {
+      expect(option.textContent).toMatch(/\(\d+\)$/);
+    }
+  });
+
   it("says when the review does not exist", async () => {
     renderApp(fastClient(), "/reviews/nope");
     expect(await screen.findByText("Review not found")).toBeInTheDocument();
