@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/auth"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
 const (
@@ -22,6 +23,18 @@ type AuthService interface {
 	Callback(ctx context.Context, code, gotState, wantState string) (sessionToken string, expiresAt time.Time, err error)
 	CurrentUser(ctx context.Context, sessionToken string) (auth.User, error)
 	Logout(ctx context.Context, sessionToken string) error
+	UserGitHubToken(ctx context.Context, userID string) (string, error)
+}
+
+// viewerContext returns the request's context marked with who is asking, and
+// that user (nil if anonymous). Reviews made while signed in are private to
+// their creator, so every review endpoint must read and write through it.
+func (a *API) viewerContext(r *http.Request) (context.Context, *auth.User) {
+	user := a.sessionUser(r)
+	if user == nil {
+		return r.Context(), nil
+	}
+	return review.WithViewer(r.Context(), user.ID), user
 }
 
 // handleLogin redirects the browser to GitHub, after setting a short-lived

@@ -25,6 +25,17 @@ const reviewSelect = `
 const findingColumns = `id, skill_id, check_id, source, severity, confidence, file,
 	line, end_line, evidence, found, why, improvement, lesson_id`
 
+// visibleTo is the condition (with one placeholder for the viewer's id) that
+// limits reviews to anonymous ones and the viewer's own; see migration 0003.
+const visibleTo = "(r.owner_id IS NULL OR r.owner_id = %s)"
+
+// viewerArg is the viewer's user id for a query, or NULL when anonymous. A NULL
+// never equals owner_id, so an anonymous caller sees only unowned reviews.
+func viewerArg(ctx context.Context) sql.NullInt64 {
+	n, ok := parseID(review.ViewerFrom(ctx))
+	return sql.NullInt64{Int64: n, Valid: ok}
+}
+
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanReview(row rowScanner) (review.Review, error) {
@@ -106,8 +117,8 @@ func (s *Store) CreateReview(ctx context.Context, owner, repo string, number int
 		return review.Review{}, fmt.Errorf("upsert pull request: %w", err)
 	}
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO reviews (pull_request_id, status_message) VALUES ($1, 'Waiting to start')
-		RETURNING id`, prID).Scan(&reviewID)
+		INSERT INTO reviews (pull_request_id, owner_id, status_message) VALUES ($1, $2, 'Waiting to start')
+		RETURNING id`, prID, viewerArg(ctx)).Scan(&reviewID)
 	if err != nil {
 		return review.Review{}, fmt.Errorf("insert review: %w", err)
 	}
@@ -124,7 +135,8 @@ func (s *Store) GetReview(ctx context.Context, id string) (review.Review, error)
 		return review.Review{}, review.ErrReviewNotFound
 	}
 
-	rv, err := scanReview(s.db.QueryRowContext(ctx, reviewSelect+" WHERE r.id = $1", n))
+	rv, err := scanReview(s.db.QueryRowContext(ctx,
+		reviewSelect+" WHERE r.id = $1 AND "+fmt.Sprintf(visibleTo, "$2"), n, viewerArg(ctx)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return review.Review{}, review.ErrReviewNotFound
 	}
@@ -155,7 +167,7 @@ func (s *Store) GetReview(ctx context.Context, id string) (review.Review, error)
 // ListReviews returns the most recent reviews, newest first, without their
 // findings but with per-severity counts.
 func (s *Store) ListReviews(ctx context.Context, limit int) ([]review.Review, error) {
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT r.id, r.status, r.status_message, r.status_at, r.error_code, r.error_message,
 		       r.created_at, r.completed_at, r.head_sha,
 		       repo.owner, repo.name, pr.number, pr.title, pr.author, pr.url, pr.state,
@@ -171,8 +183,9 @@ func (s *Store) ListReviews(ctx context.Context, limit int) ([]review.Review, er
 			       COUNT(*) FILTER (WHERE f.severity = 'suggestion') AS suggestion
 			FROM findings f WHERE f.review_id = r.id
 		) c
+		WHERE %s
 		ORDER BY r.created_at DESC, r.id DESC
-		LIMIT $1`, limit)
+		LIMIT $2`, fmt.Sprintf(visibleTo, "$1")), viewerArg(ctx), limit)
 	if err != nil {
 		return nil, fmt.Errorf("list reviews: %w", err)
 	}
@@ -215,7 +228,10 @@ func (s *Store) GetFinding(ctx context.Context, reviewID, findingID string) (rev
 	}
 
 	f, err := scanFinding(s.db.QueryRowContext(ctx,
-		"SELECT "+findingColumns+" FROM findings WHERE id = $1 AND review_id = $2", fid, rid))
+		"SELECT "+findingColumns+` FROM findings
+		WHERE id = $1 AND review_id = $2
+		  AND EXISTS (SELECT 1 FROM reviews r WHERE r.id = findings.review_id AND `+fmt.Sprintf(visibleTo, "$3")+")",
+		fid, rid, viewerArg(ctx)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return review.Finding{}, review.ErrFindingNotFound
 	}

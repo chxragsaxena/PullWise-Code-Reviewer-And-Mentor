@@ -16,6 +16,10 @@ const sessionTTL = 30 * 24 * time.Hour
 // one issued for this login attempt — the request is not trusted.
 var ErrStateMismatch = errors.New("oauth state mismatch")
 
+// ErrTokenExpired means the stored GitHub access token has expired and there is
+// no refresh yet; the user must sign in again to restore private-repo access.
+var ErrTokenExpired = errors.New("github access token expired")
+
 // Store is what Service needs from persistence. *store.Store satisfies this
 // directly: its methods already return this package's User/Tokens types.
 type Store interface {
@@ -116,9 +120,9 @@ func (s *Service) Logout(ctx context.Context, sessionToken string) error {
 // UserGitHubToken decrypts a user's current GitHub access token, for making
 // API calls on their behalf (e.g. reviewing a private repository).
 //
-// It does not yet refresh an expired token — see docs/TRACKER.md; a caller
-// should treat a GitHub 401 using this token as "ask the user to log in
-// again" until refresh is implemented.
+// It does not yet refresh an expired token — see docs/TRACKER.md. Instead it
+// returns ErrTokenExpired, so callers fall back to anonymous access rather
+// than sending a token GitHub will reject (even for public repositories).
 func (s *Service) UserGitHubToken(ctx context.Context, userID string) (string, error) {
 	tokens, err := s.store.GetTokens(ctx, userID)
 	if err != nil {
@@ -126,6 +130,9 @@ func (s *Service) UserGitHubToken(ctx context.Context, userID string) (string, e
 	}
 	if len(tokens.AccessEnc) == 0 {
 		return "", errors.New("user has no stored github token")
+	}
+	if tokens.ExpiresAt != nil && !tokens.ExpiresAt.After(time.Now()) {
+		return "", ErrTokenExpired
 	}
 	return s.crypt.Decrypt(tokens.AccessEnc)
 }

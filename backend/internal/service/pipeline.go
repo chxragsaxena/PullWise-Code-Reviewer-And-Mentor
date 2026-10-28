@@ -36,7 +36,8 @@ func (e *analysisError) Unwrap() error { return e.err }
 
 // run processes one review to completion. It always leaves the review in a
 // terminal state, whatever goes wrong, so a panic never kills a worker.
-func (s *Service) run(id string, ref github.PullRequestRef) {
+func (s *Service) run(j job) {
+	id, ref := j.id, j.ref
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic while processing review", "review", id, "panic", r)
@@ -52,6 +53,9 @@ func (s *Service) run(id string, ref github.PullRequestRef) {
 
 	ctx, cancel := context.WithTimeout(s.baseCtx, s.cfg.ReviewTimeout)
 	defer cancel()
+	if j.token != "" {
+		ctx = github.WithRequestToken(ctx, j.token)
+	}
 
 	findings, message, err := s.execute(ctx, id, ref)
 	if err != nil {

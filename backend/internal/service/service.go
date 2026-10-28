@@ -109,6 +109,9 @@ type Service struct {
 type job struct {
 	id  string
 	ref github.PullRequestRef
+	// token is the creating user's own GitHub token, if they were signed in.
+	// It lives only in memory for the life of the job and is never stored.
+	token string
 }
 
 // New builds a Service and starts its workers. Call Close to stop them.
@@ -143,7 +146,7 @@ func New(store ReviewStore, recorder ReviewRecorder, source PullRequestSource, c
 func (s *Service) worker() {
 	defer s.wg.Done()
 	for j := range s.jobs {
-		s.run(j.id, j.ref)
+		s.run(j)
 	}
 }
 
@@ -186,7 +189,9 @@ func (s *Service) Create(ctx context.Context, prURL string) (review.Review, erro
 		s.failUnstarted(rv.ID)
 		return review.Review{}, ErrShuttingDown
 	}
-	s.jobs <- job{id: rv.ID, ref: ref} // room is guaranteed by the reservation
+	// Room is guaranteed by the reservation. The token comes from the request
+	// context, set by the HTTP layer for signed-in users.
+	s.jobs <- job{id: rv.ID, ref: ref, token: github.RequestToken(ctx)}
 	return rv, nil
 }
 

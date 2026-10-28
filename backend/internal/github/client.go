@@ -234,8 +234,14 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, accept 
 	req.Header.Set("Accept", accept)
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "pullwise")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	// A signed-in user's own token wins over the server-wide one, so their
+	// private repositories are reachable and their rate limit is used.
+	token := c.token
+	if t := RequestToken(ctx); t != "" {
+		token = t
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := c.http.Do(req)

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/auth"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/service"
 )
@@ -31,7 +33,24 @@ func (a *API) createReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rv, err := a.svc.Create(r.Context(), body.PRURL)
+	ctx, user := a.viewerContext(r)
+	if user != nil {
+		// Use the user's own GitHub access (private repos, their rate limit).
+		// If it can't be had — expired, or never stored — carry on as the
+		// server's anonymous client: public PRs still work, and the review is
+		// still the user's own.
+		token, err := a.auth.UserGitHubToken(ctx, user.ID)
+		switch {
+		case err == nil:
+			ctx = github.WithRequestToken(ctx, token)
+		case errors.Is(err, auth.ErrTokenExpired):
+			slog.Info("github token expired; reviewing without it", "user", user.ID)
+		default:
+			slog.Warn("could not load github token; reviewing without it", "user", user.ID, "error", err)
+		}
+	}
+
+	rv, err := a.svc.Create(ctx, body.PRURL)
 	if err != nil {
 		writeServiceError(w, r, err)
 		return
@@ -50,7 +69,8 @@ func (a *API) listReviews(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	reviews, err := a.svc.List(r.Context(), limit)
+	ctx, _ := a.viewerContext(r)
+	reviews, err := a.svc.List(ctx, limit)
 	if err != nil {
 		writeServiceError(w, r, err)
 		return
@@ -64,7 +84,8 @@ func (a *API) listReviews(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getReview(w http.ResponseWriter, r *http.Request) {
-	rv, err := a.svc.Get(r.Context(), r.PathValue("id"))
+	ctx, _ := a.viewerContext(r)
+	rv, err := a.svc.Get(ctx, r.PathValue("id"))
 	if err != nil {
 		writeServiceError(w, r, err)
 		return
@@ -73,7 +94,8 @@ func (a *API) getReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) getFinding(w http.ResponseWriter, r *http.Request) {
-	detail, err := a.svc.GetFinding(r.Context(), r.PathValue("id"), r.PathValue("findingId"))
+	ctx, _ := a.viewerContext(r)
+	detail, err := a.svc.GetFinding(ctx, r.PathValue("id"), r.PathValue("findingId"))
 	if err != nil {
 		writeServiceError(w, r, err)
 		return

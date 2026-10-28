@@ -144,8 +144,25 @@ The server closes the stream after a terminal status (`completed` or `failed`),
 including for reviews that are already finished. Clients close their `EventSource`
 on a terminal status so the browser does not auto-reconnect.
 
+## Signed-in reviews and privacy (V2)
+When GitHub login is configured (see the `/auth/*` routes), a request carrying a
+valid session cookie is "signed in":
+
+- `POST /api/reviews` records the signed-in user as the review's **owner** and
+  reviews the pull request with **that user's own GitHub token**, so private
+  repositories they can access work and their rate limit applies. If their token has
+  expired the review still runs, as the owner, with the server's anonymous access
+  (public PRs only) until they sign in again.
+- A review with an owner is **private**: `GET /api/reviews` lists only the caller's
+  own reviews plus anonymous ones, and `GET /api/reviews/{id}`, `/findings/{findingId}`
+  and `/events` answer **404** (`review_not_found` / `finding_not_found`, identical
+  to a missing one) to anyone else, including anonymous callers.
+- Reviews created while signed out have no owner and stay public, exactly as in V1.
+- The GitHub token is never stored on the review or returned by any endpoint.
+
 ## Not in v1
-Authentication, private repositories, deleting reviews, pagination beyond `limit`,
+Private-repository access (added in V2, above), deleting reviews, sharing a private
+review, pagination beyond `limit`,
 a `total` count on lists, Redis, NATS or any job queue. V1 runs reviews in a
 background goroutine inside the Go server; a queue comes only when there is a real
 need for durable asynchronous workers.

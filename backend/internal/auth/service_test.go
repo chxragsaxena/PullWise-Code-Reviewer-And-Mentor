@@ -263,6 +263,40 @@ func TestCurrentUserWithUnknownTokenFails(t *testing.T) {
 	}
 }
 
+func TestUserGitHubTokenRefusesAnExpiredToken(t *testing.T) {
+	svc, store := newTestService(t, nil, nil)
+	enc, err := svc.crypt.Encrypt("tok_old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	past, future := time.Now().Add(-time.Minute), time.Now().Add(time.Hour)
+
+	tests := []struct {
+		name      string
+		expiresAt *time.Time
+		wantErr   error
+	}{
+		{"expired", &past, ErrTokenExpired},
+		{"still valid", &future, nil},
+		{"no expiry recorded (token never expires)", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store.tokens["1"] = Tokens{AccessEnc: enc, ExpiresAt: tt.expiresAt}
+			got, err := svc.UserGitHubToken(context.Background(), "1")
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+			if tt.wantErr == nil && got != "tok_old" {
+				t.Fatalf("token = %q, want tok_old", got)
+			}
+			if tt.wantErr != nil && got != "" {
+				t.Fatal("an expired token must not be returned")
+			}
+		})
+	}
+}
+
 func TestUserGitHubTokenWithNoStoredTokenFails(t *testing.T) {
 	svc, store := newTestService(t, nil, nil)
 	store.tokens["1"] = Tokens{} // no AccessEnc

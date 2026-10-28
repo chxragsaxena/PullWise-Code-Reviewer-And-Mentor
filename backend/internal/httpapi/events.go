@@ -15,7 +15,8 @@ import (
 // ends after a terminal status. If the stream drops, the browser reconnects and
 // is simply told the current status again, so nothing needs to be replayed.
 func (a *API) streamEvents(w http.ResponseWriter, r *http.Request) {
-	stream, err := a.svc.Watch(r.Context(), r.PathValue("id"))
+	ctx, _ := a.viewerContext(r)
+	stream, err := a.svc.Watch(ctx, r.PathValue("id"))
 	if err != nil {
 		writeServiceError(w, r, err) // still a normal JSON error: nothing streamed yet
 		return

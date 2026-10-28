@@ -18,6 +18,12 @@ type fakeAuth struct {
 	callback     func(code, gotState, wantState string) (string, time.Time, error)
 	usersByToken map[string]auth.User
 	loggedOut    []string
+	githubToken  string // returned by UserGitHubToken
+	githubErr    error
+}
+
+func (f *fakeAuth) UserGitHubToken(context.Context, string) (string, error) {
+	return f.githubToken, f.githubErr
 }
 
 func (f *fakeAuth) Login() (string, string, error) {
