@@ -57,12 +57,15 @@ func (e *APIError) Is(target error) bool {
 
 // PullRequest is the metadata of a pull request.
 type PullRequest struct {
-	Ref          PullRequestRef
-	Title        string
-	Author       string
-	URL          string
-	State        string
-	HeadSHA      string
+	Ref     PullRequestRef
+	Title   string
+	Author  string
+	URL     string
+	State   string
+	HeadSHA string
+	// BaseSHA is the commit the pull request branches from: the codebase as it
+	// stands without the change, shared by every PR against the same base.
+	BaseSHA      string
 	FilesChanged int
 	Additions    int
 	Deletions    int
@@ -123,6 +126,9 @@ func (c *Client) FetchPullRequest(ctx context.Context, ref PullRequestRef) (Pull
 		Head struct {
 			SHA string `json:"sha"`
 		} `json:"head"`
+		Base struct {
+			SHA string `json:"sha"`
+		} `json:"base"`
 	}
 	if err := c.getJSON(ctx, pullPath(ref), nil, &body); err != nil {
 		return PullRequest{}, fmt.Errorf("fetch pull request %s: %w", ref, err)
@@ -135,6 +141,7 @@ func (c *Client) FetchPullRequest(ctx context.Context, ref PullRequestRef) (Pull
 		URL:          body.HTMLURL,
 		State:        body.State,
 		HeadSHA:      body.Head.SHA,
+		BaseSHA:      body.Base.SHA,
 		FilesChanged: body.ChangedFiles,
 		Additions:    body.Additions,
 		Deletions:    body.Deletions,

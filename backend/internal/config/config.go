@@ -22,9 +22,6 @@ type Config struct {
 	// GroqAPIKey enables the AI review pass (kind: ai checks) via Groq. Empty
 	// disables it — reviews stay deterministic-only, exactly as before it existed.
 	GroqAPIKey string
-	// CohereAPIKey enables text embeddings for the repository knowledge base
-	// (V4). Empty disables it.
-	CohereAPIKey string
 
 	// GitHub OAuth (login). Empty ClientID disables login entirely — every
 	// /auth/* route then degrades to "not configured" / "not logged in".
@@ -39,6 +36,20 @@ type Config struct {
 	// SecureCookies marks session/state cookies Secure (HTTPS-only). Leave
 	// false for local HTTP development.
 	SecureCookies bool
+
+	// The knowledge service (separate repo: pullwise-knowledge) gives the AI
+	// review related code from the rest of the repository. Empty URL disables it.
+	KnowledgeURL string
+	// KnowledgeJWTSecret signs the tokens sent to it; it must equal the secret
+	// the knowledge service verifies with.
+	KnowledgeJWTSecret   string
+	KnowledgeJWTIssuer   string
+	KnowledgeJWTAudience string
+	// Optional TLS: the CA that signed the service's certificate, and this
+	// service's own certificate and key (for mutual TLS).
+	KnowledgeTLSCAFile   string
+	KnowledgeTLSCertFile string
+	KnowledgeTLSKeyFile  string
 
 	// MaxConcurrentReviews is how many reviews are processed at once.
 	MaxConcurrentReviews int
@@ -64,14 +75,26 @@ func Load() (Config, error) {
 		GitHubToken: os.Getenv("GITHUB_TOKEN"),
 		GroqAPIKey:  os.Getenv("GROQ_API_KEY"),
 
-		CohereAPIKey: os.Getenv("COHERE_API_KEY"),
-
 		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
 		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
 		GitHubOAuthRedirectURL:  getenv("GITHUB_OAUTH_REDIRECT_URL", "http://localhost:8080/auth/github/callback"),
 		SessionSecret:           os.Getenv("SESSION_SECRET"),
 		FrontendURL:             getenv("FRONTEND_URL", "http://localhost:5173"),
 		SecureCookies:           os.Getenv("SECURE_COOKIES") == "true",
+
+		KnowledgeURL:         os.Getenv("KNOWLEDGE_URL"),
+		KnowledgeJWTSecret:   os.Getenv("KNOWLEDGE_JWT_SECRET"),
+		KnowledgeJWTIssuer:   getenv("KNOWLEDGE_JWT_ISSUER", "pullwise"),
+		KnowledgeJWTAudience: getenv("KNOWLEDGE_JWT_AUDIENCE", "pullwise-knowledge"),
+		KnowledgeTLSCAFile:   os.Getenv("KNOWLEDGE_TLS_CA_FILE"),
+		KnowledgeTLSCertFile: os.Getenv("KNOWLEDGE_TLS_CERT_FILE"),
+		KnowledgeTLSKeyFile:  os.Getenv("KNOWLEDGE_TLS_KEY_FILE"),
+	}
+	if c.KnowledgeURL != "" && len(c.KnowledgeJWTSecret) < 32 {
+		errs = append(errs, errors.New("KNOWLEDGE_JWT_SECRET (at least 32 bytes) is required when KNOWLEDGE_URL is set"))
+	}
+	if (c.KnowledgeTLSCertFile == "") != (c.KnowledgeTLSKeyFile == "") {
+		errs = append(errs, errors.New("KNOWLEDGE_TLS_CERT_FILE and KNOWLEDGE_TLS_KEY_FILE must be set together"))
 	}
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL is required (see .env.example)"))

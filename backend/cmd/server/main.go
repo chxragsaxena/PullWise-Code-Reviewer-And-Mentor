@@ -19,10 +19,12 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/knowledge"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/service"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/store"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/tlsconfig"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/migrations"
 )
 
@@ -113,10 +115,26 @@ func run() error {
 		slog.Warn("GROQ_API_KEY is not set: the AI review pass is disabled, reviews will be deterministic-only")
 	}
 
+	// The knowledge service (a separate repo, pullwise-knowledge) lets the AI pass
+	// see code related to a change from the rest of the repository. Optional:
+	// without it reviews see only the diff.
+	var kb service.Knowledge
+	if cfg.KnowledgeURL != "" {
+		client, err := newKnowledgeClient(cfg)
+		if err != nil {
+			return err
+		}
+		kb = client
+		slog.Info("repository knowledge base enabled", "url", cfg.KnowledgeURL, "mutual_tls", cfg.KnowledgeTLSCertFile != "")
+	} else {
+		slog.Warn("KNOWLEDGE_URL is not set: the AI pass will not see code beyond the diff")
+	}
+
 	svc := service.New(st, st, github.NewClient(opts...), service.Config{
 		Skills:        loadedSkills,
 		Analyzers:     analyzers,
 		AIProvider:    aiProvider,
+		Knowledge:     kb,
 		MaxConcurrent: cfg.MaxConcurrentReviews,
 		MaxPending:    cfg.MaxQueuedReviews,
 		ReviewTimeout: cfg.ReviewTimeout,
@@ -189,6 +207,24 @@ func run() error {
 	}
 	closeService(svc)
 	return nil
+}
+
+// newKnowledgeClient builds the client for the knowledge service, over TLS (and
+// mutual TLS, if a client certificate is configured) when a CA is given.
+func newKnowledgeClient(cfg config.Config) (*knowledge.Client, error) {
+	var opts []knowledge.Option
+	if cfg.KnowledgeTLSCAFile != "" || cfg.KnowledgeTLSCertFile != "" {
+		tlsCfg, err := tlsconfig.Client(cfg.KnowledgeTLSCertFile, cfg.KnowledgeTLSKeyFile, cfg.KnowledgeTLSCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("knowledge service TLS: %w", err)
+		}
+		opts = append(opts, knowledge.WithTLS(tlsCfg))
+	}
+	client, err := knowledge.New(cfg.KnowledgeURL, []byte(cfg.KnowledgeJWTSecret), cfg.KnowledgeJWTIssuer, cfg.KnowledgeJWTAudience, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("knowledge service client: %w", err)
+	}
+	return client, nil
 }
 
 // complexityThreshold reads a skill's high-complexity threshold from its

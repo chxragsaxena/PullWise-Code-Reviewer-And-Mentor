@@ -56,6 +56,7 @@ func (s *Service) run(j job) {
 	if j.token != "" {
 		ctx = github.WithRequestToken(ctx, j.token)
 	}
+	ctx = review.WithViewer(ctx, j.viewer)
 
 	findings, message, err := s.execute(ctx, id, ref)
 	if err != nil {
@@ -127,7 +128,8 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 		if err := s.transition(ctx, id, review.StatusReviewing, "Reviewing in context"); err != nil {
 			return nil, "", err
 		}
-		aiRaw := s.runAI(ctx, selected, inputs)
+		related := s.relatedCode(ctx, id, ref, pr, inputs)
+		aiRaw := s.runAI(ctx, selected, inputs, related)
 		findings = append(findings, s.normalizeAI(aiRaw, selected)...)
 	}
 	sortFindings(findings)
@@ -156,7 +158,7 @@ func hasAICheck(selected map[string]skills.Skill) bool {
 // skill's AI pass found nothing" rather than failing the review: the
 // deterministic findings are already complete and valuable on their own, and
 // one flaky or rate-limited call should not throw them away.
-func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, files []review.ChangedFile) []review.Finding {
+func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, files []review.ChangedFile, related []ai.ContextSnippet) []review.Finding {
 	var out []review.Finding
 	for _, sk := range selected {
 		var checks []skills.Check
@@ -179,7 +181,7 @@ func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, f
 			continue
 		}
 
-		found, err := s.aiProvider.Review(ctx, ai.ReviewInput{Skill: sk, Checks: checks, Files: skillFiles})
+		found, err := s.aiProvider.Review(ctx, ai.ReviewInput{Skill: sk, Checks: checks, Files: skillFiles, Context: related})
 		if err != nil {
 			slog.Warn("ai review pass failed; continuing with deterministic findings only", "skill", sk.ID, "error", err)
 			continue

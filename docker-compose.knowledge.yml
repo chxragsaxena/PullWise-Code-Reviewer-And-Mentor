@@ -1,0 +1,48 @@
+# Adds the knowledge service, which lives in its own repository
+# (github.com/chxragsaxena/pullwise-knowledge), next to PullWise. Clone it beside
+# this repo (so it sits at ../pullwise-knowledge), then:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.knowledge.yml up -d --build
+#
+# Needs in .env: KNOWLEDGE_JWT_SECRET (>= 32 bytes; openssl rand -base64 32),
+# KNOWLEDGE_DB_PASSWORD, and COHERE_API_KEY. The knowledge service and its database
+# are not published to the host: only the backend can reach them, over the compose
+# network. For mutual TLS between the two, see the knowledge repo's README.
+
+services:
+  backend:
+    environment:
+      KNOWLEDGE_URL: http://knowledge:8081
+      KNOWLEDGE_JWT_SECRET: ${KNOWLEDGE_JWT_SECRET:?Set KNOWLEDGE_JWT_SECRET in .env}
+    depends_on:
+      - knowledge
+
+  knowledge-db:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: knowledge
+      POSTGRES_DB: knowledge
+      POSTGRES_PASSWORD: ${KNOWLEDGE_DB_PASSWORD:?Set KNOWLEDGE_DB_PASSWORD in .env}
+    volumes:
+      - knowledge-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledge -d knowledge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  knowledge:
+    build: ../pullwise-knowledge
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://knowledge:${KNOWLEDGE_DB_PASSWORD}@knowledge-db:5432/knowledge?sslmode=disable
+      COHERE_API_KEY: ${COHERE_API_KEY:?Set COHERE_API_KEY in .env}
+      JWT_SECRET: ${KNOWLEDGE_JWT_SECRET}
+      ADDR: ":8081"
+    depends_on:
+      knowledge-db:
+        condition: service_healthy
+
+volumes:
+  knowledge-pgdata:

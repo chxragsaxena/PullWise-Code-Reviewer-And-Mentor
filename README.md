@@ -37,7 +37,30 @@ flowchart LR
   API --> AUTH[GitHub OAuth<br/>sessions, AES-GCM tokens]
   AUTH --> DB
   SK[skills/*.yaml + lessons] --> SVC
+  SVC -. signed token + optional mutual TLS .-> KB[Knowledge service<br/>separate repo]
+  KB --> VDB[(PostgreSQL + pgvector<br/>its own database)]
+  KB --> EMB[Cohere embeddings]
 ```
+
+### The knowledge service (a separate repository)
+
+[**pullwise-knowledge**](https://github.com/chxragsaxena/pullwise-knowledge) indexes a
+repository's code and finds the parts related to a change, so the AI pass can judge a
+change against the code around it instead of the diff alone. It is an independently
+deployable service with its own repo, database, API contract and tests; PullWise calls
+it over HTTP and never touches its database.
+
+- **Per review:** PullWise downloads the repository's base commit in one GitHub
+  request, sends the source files to the service (skipped when that commit is already
+  indexed), searches it with the changed code, and adds the best matches to the AI
+  prompt as read-only context.
+- **Optional and non-fatal:** with no `KNOWLEDGE_URL`, or if the service is down, the
+  review simply runs without extra context.
+- **Secured service-to-service:** every call carries a short-lived signed token naming
+  the tenant (a signed-in user's own index, or a shared one for anonymous reviews of
+  public repos) and a minimal scope; mutual TLS is available so only callers holding a
+  certificate from your CA can connect at all. Tenant isolation is enforced in the
+  service and covered by tests. Details in that repository's README.
 
 Design notes live in [docs/architecture.md](docs/architecture.md); the REST contract
 is [docs/api.md](docs/api.md); progress and decisions are in
@@ -74,6 +97,13 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 Open http://localhost:8080.
 
+To add the knowledge service (clone [pullwise-knowledge](https://github.com/chxragsaxena/pullwise-knowledge)
+next to this repo, and set `KNOWLEDGE_JWT_SECRET`, `KNOWLEDGE_DB_PASSWORD` and `COHERE_API_KEY` in `.env`):
+
+```
+docker compose -f docker-compose.prod.yml -f docker-compose.knowledge.yml up -d --build
+```
+
 ### Develop locally
 
 ```
@@ -97,7 +127,7 @@ than breaking the app.
 | `GITHUB_TOKEN` | Raises the anonymous GitHub rate limit (60 to 5,000 requests/hour) |
 | `GITHUB_OAUTH_CLIENT_ID` / `_CLIENT_SECRET`, `SESSION_SECRET` | "Sign in with GitHub" and private-repo reviews (`SESSION_SECRET` is a base64 32-byte key) |
 | `PUBLIC_URL`, `SECURE_COOKIES` | Set when deploying behind a real domain (use `https`) |
-| `COHERE_API_KEY` | Text embeddings for the planned repository knowledge base |
+| `KNOWLEDGE_URL`, `KNOWLEDGE_JWT_SECRET` | Turns on the repository knowledge base (the separate service); the secret must match the service's `JWT_SECRET`. Optional `KNOWLEDGE_TLS_*` files enable mutual TLS |
 
 See [.env.example](.env.example) for the full list.
 
@@ -114,7 +144,7 @@ cd frontend && npm test
 |---|---|
 | Public-PR review, dashboard, Go + TypeScript analyzers, AI pass | Done |
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
-| Repository knowledge base (RAG over the repo with pgvector) | Started: the embeddings client exists and is verified; storage and retrieval are not built |
+| Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Not yet measured: how much it improves review quality (no retrieval-quality evaluation yet) |
 | GitHub App / webhooks, quizzes and progress, custom team standards | Not started |
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the

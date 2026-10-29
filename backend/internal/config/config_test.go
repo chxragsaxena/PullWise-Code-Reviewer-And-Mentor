@@ -12,10 +12,12 @@ import (
 func clearEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
-		"ADDR", "SKILLS_DIR", "DATABASE_URL", "GITHUB_TOKEN", "GROQ_API_KEY", "COHERE_API_KEY", "MAX_CONCURRENT_REVIEWS",
+		"ADDR", "SKILLS_DIR", "DATABASE_URL", "GITHUB_TOKEN", "GROQ_API_KEY", "MAX_CONCURRENT_REVIEWS",
 		"MAX_QUEUED_REVIEWS", "CREATE_RATE_PER_MINUTE", "CREATE_BURST", "REVIEW_TIMEOUT",
 		"GITHUB_OAUTH_CLIENT_ID", "GITHUB_OAUTH_CLIENT_SECRET", "GITHUB_OAUTH_REDIRECT_URL",
 		"SESSION_SECRET", "FRONTEND_URL", "SECURE_COOKIES",
+		"KNOWLEDGE_URL", "KNOWLEDGE_JWT_SECRET", "KNOWLEDGE_JWT_ISSUER", "KNOWLEDGE_JWT_AUDIENCE",
+		"KNOWLEDGE_TLS_CA_FILE", "KNOWLEDGE_TLS_CERT_FILE", "KNOWLEDGE_TLS_KEY_FILE",
 	} {
 		t.Setenv(key, "")
 	}
@@ -35,9 +37,40 @@ func TestLoadDefaults(t *testing.T) {
 		CreateRatePerMinute: 20, CreateBurst: 10,
 		GitHubOAuthRedirectURL: "http://localhost:8080/auth/github/callback",
 		FrontendURL:            "http://localhost:5173",
+		KnowledgeJWTIssuer:     "pullwise",
+		KnowledgeJWTAudience:   "pullwise-knowledge",
 	}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestKnowledgeSettingsAreValidated(t *testing.T) {
+	good := "0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		name                         string
+		url, secret, tlsCert, tlsKey string
+		wantErr                      bool
+	}{
+		{"disabled", "", "", "", "", false},
+		{"enabled", "http://localhost:8081", good, "", "", false},
+		{"enabled with mutual TLS", "https://knowledge:8081", good, "c", "k", false},
+		{"URL without a secret", "http://localhost:8081", "", "", "", true},
+		{"URL with a short secret", "http://localhost:8081", "short", "", "", true},
+		{"client cert without key", "https://k", good, "c", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://x")
+			t.Setenv("KNOWLEDGE_URL", tt.url)
+			t.Setenv("KNOWLEDGE_JWT_SECRET", tt.secret)
+			t.Setenv("KNOWLEDGE_TLS_CERT_FILE", tt.tlsCert)
+			t.Setenv("KNOWLEDGE_TLS_KEY_FILE", tt.tlsKey)
+			if _, err := Load(); (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -48,7 +81,6 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("SKILLS_DIR", "/opt/skills")
 	t.Setenv("GITHUB_TOKEN", "ghp_x")
 	t.Setenv("GROQ_API_KEY", "gsk_x")
-	t.Setenv("COHERE_API_KEY", "co_x")
 	t.Setenv("MAX_CONCURRENT_REVIEWS", "4")
 	t.Setenv("MAX_QUEUED_REVIEWS", "8")
 	t.Setenv("CREATE_RATE_PER_MINUTE", "0") // turns the limit off
@@ -66,7 +98,7 @@ func TestLoadFromEnv(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{
-		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x", GroqAPIKey: "gsk_x", CohereAPIKey: "co_x",
+		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x", GroqAPIKey: "gsk_x",
 		MaxConcurrentReviews: 4, MaxQueuedReviews: 8, ReviewTimeout: 90 * time.Second,
 		CreateRatePerMinute: 0, CreateBurst: 3,
 		GitHubOAuthClientID: "oauth-id", GitHubOAuthClientSecret: "oauth-secret",
@@ -74,6 +106,8 @@ func TestLoadFromEnv(t *testing.T) {
 		SessionSecret:          "c2Vzc2lvbi1zZWNyZXQtMzItYnl0ZXMtbG9uZy0h",
 		FrontendURL:            "https://example.com",
 		SecureCookies:          true,
+		KnowledgeJWTIssuer:     "pullwise",
+		KnowledgeJWTAudience:   "pullwise-knowledge",
 	}
 	if got != want {
 		t.Fatalf("got %+v\nwant %+v", got, want)

@@ -142,6 +142,10 @@ type fakeSource struct {
 	files    []github.ChangedFile
 	filesErr error
 	content  func(ctx context.Context, path string) ([]byte, error)
+
+	repoFiles   []github.SourceFile // what RepositoryFiles returns
+	repoErr     error
+	archiveShas []string // the commits RepositoryFiles was asked for
 }
 
 func newFakeSource(files ...string) *fakeSource {
@@ -177,6 +181,15 @@ func (s *fakeSource) ListFiles(context.Context, github.PullRequestRef) ([]github
 
 func (s *fakeSource) FileContent(ctx context.Context, _ github.PullRequestRef, path, _ string) ([]byte, error) {
 	return s.content(ctx, path)
+}
+
+// RepositoryFiles makes fakeSource a RepositorySource: the whole repository at a
+// commit, for the knowledge base.
+func (s *fakeSource) RepositoryFiles(_ context.Context, _ github.PullRequestRef, sha string) ([]github.SourceFile, error) {
+	s.mu.Lock()
+	s.archiveShas = append(s.archiveShas, sha)
+	s.mu.Unlock()
+	return s.repoFiles, s.repoErr
 }
 
 // fakeAI is a scriptable ai.Provider.

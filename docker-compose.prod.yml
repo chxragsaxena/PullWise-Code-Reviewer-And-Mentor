@@ -3,8 +3,9 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
 # Then open http://localhost:8080 (or WEB_PORT). Reads .env next to this file
-# (copy .env.example): POSTGRES_PASSWORD is required; GROQ_API_KEY, GITHUB_TOKEN,
-# COHERE_API_KEY and the GITHUB_OAUTH_* / SESSION_SECRET settings are optional.
+# (copy .env.example): POSTGRES_PASSWORD is required; GROQ_API_KEY, GITHUB_TOKEN
+# and the GITHUB_OAUTH_* / SESSION_SECRET settings are optional. To add the
+# knowledge service (its own repo), also pass -f docker-compose.knowledge.yml.
 #
 # Deploying behind a real domain: set PUBLIC_URL (e.g. https://pullwise.example.com)
 # and SECURE_COOKIES=true, and use that same URL + /auth/github/callback as the

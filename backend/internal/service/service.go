@@ -55,6 +55,9 @@ type Config struct {
 	// the AI pass entirely: reviews go straight from analyzing to completed,
 	// exactly as before this existed.
 	AIProvider ai.Provider
+	// Knowledge gives the AI pass related code from the rest of the repository.
+	// Nil disables it: reviews see only the diff, as before it existed.
+	Knowledge Knowledge
 
 	// MaxConcurrent is how many reviews run at once, i.e. the number of workers
 	// (default 2).
@@ -94,6 +97,7 @@ type Service struct {
 	cfg        Config
 	skills     map[string]skills.Skill
 	aiProvider ai.Provider
+	knowledge  Knowledge
 
 	jobs    chan job // FIFO queue feeding the workers
 	baseCtx context.Context
@@ -112,6 +116,9 @@ type job struct {
 	// token is the creating user's own GitHub token, if they were signed in.
 	// It lives only in memory for the life of the job and is never stored.
 	token string
+	// viewer is the creating user's id ("" if anonymous): it decides whose
+	// knowledge-base index the review uses.
+	viewer string
 }
 
 // New builds a Service and starts its workers. Call Close to stop them.
@@ -130,6 +137,7 @@ func New(store ReviewStore, recorder ReviewRecorder, source PullRequestSource, c
 		cfg:        cfg,
 		skills:     byID,
 		aiProvider: cfg.AIProvider,
+		knowledge:  cfg.Knowledge,
 		jobs:       make(chan job, cfg.MaxPending),
 		baseCtx:    ctx,
 		cancel:     cancel,
@@ -191,7 +199,7 @@ func (s *Service) Create(ctx context.Context, prURL string) (review.Review, erro
 	}
 	// Room is guaranteed by the reservation. The token comes from the request
 	// context, set by the HTTP layer for signed-in users.
-	s.jobs <- job{id: rv.ID, ref: ref, token: github.RequestToken(ctx)}
+	s.jobs <- job{id: rv.ID, ref: ref, token: github.RequestToken(ctx), viewer: review.ViewerFrom(ctx)}
 	return rv, nil
 }
 
