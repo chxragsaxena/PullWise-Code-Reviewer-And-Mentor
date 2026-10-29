@@ -51,7 +51,8 @@ custom team skills, languages beyond Go and TypeScript.
 ## Roadmap
 
 V1 public PR URL -> dashboard. V2 GitHub OAuth. V3 GitHub App and webhooks.
-V4 repository RAG. V5 quizzes and progress. V6 custom team standards.
+V4 repository knowledge base (a separate service). V6 custom team standards.
+(A quizzes-and-progress version was dropped.)
 
 ## Decisions
 

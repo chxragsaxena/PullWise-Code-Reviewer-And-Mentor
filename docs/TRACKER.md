@@ -47,17 +47,17 @@ PostgreSQL = what happened. Claude = contextual reasoning (only `kind: ai` check
 - The user will suggest visual/UX changes to the frontend later.
 
 ## Out of scope (do not build unless asked)
-GitHub App/webhooks (V3), Redis, NATS, repo RAG, auto-fix/rewrite,
-custom team skills, >2 languages, agentic architecture, microservices, IDE features.
-V3-V6 are not started. **V2 (GitHub OAuth) is in progress** — login, per-user GitHub token and private reviews are built; token refresh and review sharing are not.
+GitHub App/webhooks (V3), Redis, NATS, auto-fix/rewrite, agentic architecture, IDE features.
+**V5 (quizzes, practice, progress) was dropped by the user on 2026-10-29: do not build it, and do not propose it again.**
+Status: V1, V2 and V4 are built (V4 as a separate service in its own repo). V3 and V6 are not started (V6, custom team standards, is designed: a "Your standards" page, est. 4-6 days). Review sharing is not built.
 
 ## Roadmap
 - **V1** Public PR URL -> review -> educational dashboard — done
 - **V2** GitHub OAuth, private repos — **done and verified live (login, per-user token with refresh, private reviews); only review sharing is not built**
 - V3 GitHub App, webhook reviews
-- V4 Repository RAG (pgvector) — **groundwork only**: `internal/embed` has an `Embedder` interface + `CohereEmbedder` (see Session log 2026-10-28). Nothing consumes it yet; pgvector image swap, chunking, storage, retrieval not started.
-- V5 Learning system: quizzes, practice, progress
-- V6 Custom team standards
+- **V4** Repository knowledge base (pgvector) — **done as a separate service/repo (`pullwise-knowledge`), verified end to end; retrieval quality not yet evaluated** (see the knowledge-base entry above)
+- ~~V5 Learning system: quizzes, practice, progress~~ — **dropped by the user (2026-10-29)**
+- V6 Custom team standards — designed, not built
 
 Rough progress (2026-10-11): **V1 is 100% done** (fully built, tested, live-verified). **V2 is about 95%**: OAuth login, per-user GitHub token (with automatic refresh), and private-by-owner reviews are built and were verified live against a real private repo; only sharing a private review with another person is not built. V3-V6 not started. Full V1-V6 roadmap: roughly **40-45% by effort** (V1 was the largest single chunk of the total build, so finishing it moved this more than V2 alone will).
 

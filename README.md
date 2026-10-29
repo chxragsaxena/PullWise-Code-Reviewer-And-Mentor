@@ -145,7 +145,7 @@ cd frontend && npm test
 | Public-PR review, dashboard, Go + TypeScript analyzers, AI pass | Done |
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
 | Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Not yet measured: how much it improves review quality (no retrieval-quality evaluation yet) |
-| GitHub App / webhooks, quizzes and progress, custom team standards | Not started |
+| GitHub App / webhooks, custom team standards | Not started |
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the
 model's own confidence); only Go and TypeScript have exact checks; sharing a private
