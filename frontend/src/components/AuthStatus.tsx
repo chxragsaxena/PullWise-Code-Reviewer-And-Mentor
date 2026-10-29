@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useApi } from "../api/ApiProvider";
 import type { AuthUser } from "../api/types";
 import "./AuthStatus.css";
@@ -55,6 +56,9 @@ export function AuthStatus() {
 
   return (
     <div className="auth-status">
+      <Link to="/standards" className="auth-status__link">
+        Standards
+      </Link>
       <img className="auth-status__avatar" src={user.avatarUrl} alt="" width={28} height={28} />
       <span className="auth-status__login-name">{user.login}</span>
       <button type="button" className="button button--ghost" onClick={logout} disabled={busy}>

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/httpapi"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/knowledge"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/rules"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/service"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/store"
@@ -74,7 +76,8 @@ func run() error {
 	}
 
 	st := store.New(db)
-	if err := st.SyncSkills(ctx, loadedSkills); err != nil {
+	// The placeholder is the skill row that findings from users' own rules point at.
+	if err := st.SyncSkills(ctx, append(slices.Clone(loadedSkills), rules.Placeholder())); err != nil {
 		return err
 	}
 	// Reviews still in progress belong to a process that no longer exists. This
@@ -141,6 +144,7 @@ func run() error {
 	})
 
 	apiOpts := []httpapi.Option{
+		httpapi.WithRules(rules.NewService(st)),
 		httpapi.WithReadiness(db.PingContext),
 		httpapi.WithCreateRateLimit(cfg.CreateRatePerMinute, cfg.CreateBurst),
 	}

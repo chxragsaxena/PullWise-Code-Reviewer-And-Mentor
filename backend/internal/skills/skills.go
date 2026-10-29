@@ -61,12 +61,24 @@ type Skill struct {
 	Description string   `yaml:"description"`
 	Checks      []Check  `yaml:"checks"`
 
-	fsys fs.FS
-	dir  string
+	fsys   fs.FS
+	dir    string
+	inline map[string]string
 }
 
-// Lesson returns the Markdown text of a lesson file belonging to this skill.
+// NewInline builds a skill whose lessons are held in memory instead of read from files.
+func NewInline(id, name, description string, languages []string, checks []Check, lessons map[string]string) Skill {
+	return Skill{ID: id, Name: name, Version: 1, Description: description, Languages: languages, Checks: checks, inline: lessons}
+}
+
+// Lesson returns the Markdown text of a lesson belonging to this skill.
 func (s Skill) Lesson(name string) (string, error) {
+	if text, ok := s.inline[name]; ok {
+		return text, nil
+	}
+	if s.fsys == nil {
+		return "", fmt.Errorf("skill %q: no lesson %q", s.ID, name)
+	}
 	data, err := fs.ReadFile(s.fsys, path.Join(s.dir, "lessons", name+".md"))
 	if err != nil {
 		return "", fmt.Errorf("skill %q: read lesson %q: %w", s.ID, name, err)

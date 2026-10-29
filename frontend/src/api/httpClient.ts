@@ -6,6 +6,7 @@ import {
   type Review,
   type ReviewStatusEvent,
   type ReviewSummary,
+  type Rule,
 } from "./types";
 import { isTerminal } from "../lib/status";
 
@@ -24,6 +25,7 @@ export function createHttpClient(baseUrl = ""): ApiClient {
       throw new ApiError("network_error", "Could not reach the server. Check your connection and try again.", 0);
     }
     if (!response.ok) throw await toApiError(response);
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
   }
 
@@ -66,6 +68,23 @@ export function createHttpClient(baseUrl = ""): ApiClient {
 
     async logout() {
       await request("/auth/logout", { method: "POST" });
+    },
+
+    async listRules() {
+      const body = await request<{ rules: Rule[] }>("/api/rules");
+      return body.rules;
+    },
+
+    createRule(input) {
+      return request<Rule>("/api/rules", { method: "POST", body: JSON.stringify(input) });
+    },
+
+    updateRule(id, input) {
+      return request<Rule>(`/api/rules/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
+    },
+
+    async deleteRule(id) {
+      await request(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
     },
   };
 }

@@ -76,6 +76,16 @@ describe("findings helpers", () => {
     expect(skills.map((s) => s.group)).toEqual(["language", "design", "design"]);
   });
 
+  it("puts the user's own standards last, in their own group", () => {
+    const skills = uniqueSkills([
+      finding("1", "medium", "custom", "Your standards"),
+      finding("2", "medium", "solid", "SOLID"),
+      finding("3", "medium", "go", "Go"),
+    ]);
+    expect(skills.map((s) => s.id)).toEqual(["go", "solid", "custom"]);
+    expect(skills.map((s) => s.group)).toEqual(["language", "design", "standards"]);
+  });
+
   it("orders several language skills alphabetically, ahead of the design skills", () => {
     const skills = uniqueSkills([
       finding("1", "medium", "rest", "REST API Design"),

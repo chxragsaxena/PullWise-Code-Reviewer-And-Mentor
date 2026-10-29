@@ -34,6 +34,9 @@ type API struct {
 	frontendURL   string
 	secureCookies bool
 
+	// rules is nil unless the user-standards endpoints are enabled.
+	rules RuleService
+
 	done     chan struct{} // closed by BeginShutdown to end open event streams
 	doneOnce sync.Once
 }
@@ -97,6 +100,11 @@ func (a *API) Handler() http.Handler {
 	mux.Handle("/api/reviews/{id}", methods{http.MethodGet: a.getReview})
 	mux.Handle("/api/reviews/{id}/events", methods{http.MethodGet: a.streamEvents})
 	mux.Handle("/api/reviews/{id}/findings/{findingId}", methods{http.MethodGet: a.getFinding})
+
+	if a.rules != nil {
+		mux.Handle("/api/rules", methods{http.MethodGet: a.listRules, http.MethodPost: a.createRule})
+		mux.Handle("/api/rules/{id}", methods{http.MethodPut: a.updateRule, http.MethodDelete: a.deleteRule})
+	}
 
 	mux.Handle("/auth/github/login", methods{http.MethodGet: a.handleLogin})
 	mux.Handle("/auth/github/callback", methods{http.MethodGet: a.handleCallback})

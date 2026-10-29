@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/rules"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 )
 
@@ -30,6 +32,7 @@ type ReviewStore interface {
 	GetReview(ctx context.Context, id string) (review.Review, error)
 	ListReviews(ctx context.Context, limit int) ([]review.Review, error)
 	GetFinding(ctx context.Context, reviewID, findingID string) (review.Finding, error)
+	ReviewRules(ctx context.Context, reviewID string) ([]review.Rule, error)
 }
 
 // ReviewRecorder is what the background pipeline needs from persistence.
@@ -38,6 +41,7 @@ type ReviewRecorder interface {
 	SavePullRequest(ctx context.Context, id string, pr review.PullRequest) error
 	CompleteReview(ctx context.Context, id string, findings []review.Finding, message string) error
 	FailReview(ctx context.Context, id, code, message string) error
+	ReviewRules(ctx context.Context, reviewID string) ([]review.Rule, error)
 }
 
 // PullRequestSource reads pull requests from GitHub.
@@ -218,8 +222,9 @@ func (s *Service) Get(ctx context.Context, id string) (review.Review, error) {
 	if err != nil {
 		return review.Review{}, err
 	}
+	custom := s.customSkill(ctx, id, rv.Findings)
 	for i := range rv.Findings {
-		rv.Findings[i] = s.enrich(rv.Findings[i])
+		rv.Findings[i] = s.enrichWith(rv.Findings[i], custom)
 	}
 	return rv, nil
 }
@@ -254,11 +259,12 @@ func (s *Service) GetFinding(ctx context.Context, reviewID, findingID string) (F
 	if err != nil {
 		return FindingDetail{}, err
 	}
-	f = s.enrich(f)
+	custom := s.customSkill(ctx, reviewID, []review.Finding{f})
+	f = s.enrichWith(f, custom)
 
 	detail := FindingDetail{Finding: f}
 	if f.Lesson != "" {
-		if sk, ok := s.skills[f.SkillID]; ok {
+		if sk, ok := s.skillByID(f.SkillID, custom); ok {
 			if md, err := sk.Lesson(f.Lesson); err != nil {
 				slog.Warn("lesson unavailable", "skill", f.SkillID, "lesson", f.Lesson, "error", err)
 			} else {
@@ -269,10 +275,38 @@ func (s *Service) GetFinding(ctx context.Context, reviewID, findingID string) (F
 	return detail, nil
 }
 
-// enrich fills the display names that come from skill definitions, which the
-// database does not store. Unknown skills or checks fall back to their ids.
-func (s *Service) enrich(f review.Finding) review.Finding {
-	if sk, ok := s.skills[f.SkillID]; ok {
+// customSkill returns the review's own-standards skill if any finding came from it.
+func (s *Service) customSkill(ctx context.Context, reviewID string, findings []review.Finding) *skills.Skill {
+	if !slices.ContainsFunc(findings, func(f review.Finding) bool { return f.SkillID == rules.SkillID }) {
+		return nil
+	}
+	rs, err := s.store.ReviewRules(ctx, reviewID)
+	if err != nil {
+		slog.Warn("could not read the review's rules", "review", reviewID, "error", err)
+		return nil
+	}
+	if sk, ok := rules.Skill(rs); ok {
+		return &sk
+	}
+	return nil
+}
+
+// skillByID finds a built-in skill, or the review's custom one.
+func (s *Service) skillByID(id string, custom *skills.Skill) (skills.Skill, bool) {
+	if sk, ok := s.skills[id]; ok {
+		return sk, true
+	}
+	if custom != nil && custom.ID == id {
+		return *custom, true
+	}
+	return skills.Skill{}, false
+}
+
+func (s *Service) enrich(f review.Finding) review.Finding { return s.enrichWith(f, nil) }
+
+// enrichWith fills display names from skill definitions, which the database does not store.
+func (s *Service) enrichWith(f review.Finding, custom *skills.Skill) review.Finding {
+	if sk, ok := s.skillByID(f.SkillID, custom); ok {
 		f.SkillName = sk.Name
 		if c, ok := sk.Check(f.CheckID); ok {
 			f.CheckTitle = c.Title

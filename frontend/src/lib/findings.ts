@@ -40,7 +40,7 @@ export function groupBySeverity(findings: readonly Finding[]): SeverityGroup[] {
   })).filter((group) => group.findings.length > 0);
 }
 
-export type SkillGroup = "language" | "design";
+export type SkillGroup = "language" | "design" | "standards";
 
 export interface SkillOption {
   id: string;
@@ -50,18 +50,20 @@ export interface SkillOption {
   count: number;
 }
 
-/**
- * Skills that judge design rather than one language's code, in the order they
- * are shown. Any other skill (Go, TypeScript, ...) is a language skill and is
- * listed first. A skill's category isn't in the API, so a new design skill
- * must be added here to be grouped with these.
- */
+/** Design skills in display order; the API has no skill category, so new ones are added here. */
 const DESIGN_SKILL_ORDER = ["rest", "solid"];
 
-/**
- * The skills that produced findings, for a filter menu: language skills first
- * (alphabetical), then REST, then SOLID.
- */
+/** The id findings from the user's own standards are stored under. */
+const STANDARDS_SKILL_ID = "custom";
+
+const GROUP_ORDER: SkillGroup[] = ["language", "design", "standards"];
+
+function groupOf(skillId: string): SkillGroup {
+  if (skillId === STANDARDS_SKILL_ID) return "standards";
+  return DESIGN_SKILL_ORDER.includes(skillId) ? "design" : "language";
+}
+
+/** Skills that produced findings for a filter menu: language (A-Z), then REST, SOLID, then your standards. */
 export function uniqueSkills(findings: readonly Finding[]): SkillOption[] {
   const found = new Map<string, SkillOption>();
   for (const f of findings) {
@@ -69,14 +71,13 @@ export function uniqueSkills(findings: readonly Finding[]): SkillOption[] {
     if (existing) {
       existing.count += 1;
     } else {
-      const group: SkillGroup = DESIGN_SKILL_ORDER.includes(f.skillId) ? "design" : "language";
-      found.set(f.skillId, { id: f.skillId, name: f.skillName, group, count: 1 });
+      found.set(f.skillId, { id: f.skillId, name: f.skillName, group: groupOf(f.skillId), count: 1 });
     }
   }
 
   const designRank = (id: string) => DESIGN_SKILL_ORDER.indexOf(id);
   return [...found.values()].sort((a, b) => {
-    if (a.group !== b.group) return a.group === "language" ? -1 : 1;
+    if (a.group !== b.group) return GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group);
     if (a.group === "design") return designRank(a.id) - designRank(b.id);
     return a.name.localeCompare(b.name);
   });

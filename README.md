@@ -21,8 +21,12 @@ private to you.
   constrained decoding behind a small `Provider` interface (a Claude implementation
   also exists). If the AI call fails, the review still completes with the
   deterministic findings.
-- **Teaching UI.** Findings are filterable by severity and skill (language, then REST,
-  then SOLID) and open into a page with evidence, explanation, improvement and lesson.
+- **Teaching UI.** Findings are filterable by severity and skill (language, REST, SOLID,
+  then your own standards) and open into a page with evidence, explanation, improvement
+  and lesson.
+- **Your own standards.** Signed-in users write review rules in plain English ("never call
+  the database from a handler"); the AI checks their pull requests against them. Each review
+  keeps a copy of the rules it used.
 
 ## Architecture
 
@@ -145,7 +149,8 @@ cd frontend && npm test
 | Public-PR review, dashboard, Go + TypeScript analyzers, AI pass | Done |
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
 | Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Not yet measured: how much it improves review quality (no retrieval-quality evaluation yet) |
-| GitHub App / webhooks, custom team standards | Not started |
+| Your own review standards (per-user rules, snapshot per review) | Done and verified live |
+| GitHub App / webhooks | Not started |
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the
 model's own confidence); only Go and TypeScript have exact checks; sharing a private

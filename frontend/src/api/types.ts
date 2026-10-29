@@ -94,6 +94,20 @@ export interface ReviewStatusEvent {
   at: string;
 }
 
+/** A standard the user wrote for the AI to check their pull requests against. */
+export interface Rule {
+  id: string;
+  title: string;
+  instructions: string;
+  severity: Severity;
+  enabled: boolean;
+}
+
+export type RuleInput = Omit<Rule, "id">;
+
+/** Limits enforced by the backend. */
+export const RULE_LIMITS = { maxRules: 20, maxTitle: 120, maxInstructions: 1000 } as const;
+
 /** The signed-in GitHub user, from GET /auth/me. */
 export interface AuthUser {
   id: string;

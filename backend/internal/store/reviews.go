@@ -122,6 +122,16 @@ func (s *Store) CreateReview(ctx context.Context, owner, repo string, number int
 	if err != nil {
 		return review.Review{}, fmt.Errorf("insert review: %w", err)
 	}
+	// A signed-in user's enabled rules are copied, so later edits never change this review.
+	if viewer := viewerArg(ctx); viewer.Valid {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO review_rules (review_id, rule_id, title, instructions, severity)
+			SELECT $1, id, title, instructions, severity FROM custom_rules WHERE user_id = $2 AND enabled`,
+			reviewID, viewer.Int64)
+		if err != nil {
+			return review.Review{}, fmt.Errorf("snapshot rules: %w", err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return review.Review{}, fmt.Errorf("commit: %w", err)
 	}

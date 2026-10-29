@@ -13,6 +13,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/lang"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/rules"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 )
 
@@ -93,6 +94,7 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 
 	reviewable := reviewableFiles(files)
 	selected := s.selectSkills(reviewable)
+	s.addCustomRules(ctx, id, selected)
 	if len(selected) == 0 {
 		return nil, "No changed files in a supported language, so there was nothing to check", nil
 	}
@@ -141,6 +143,36 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 	return findings, closing, nil
 }
 
+// orderedSkills puts the user's own rules first, then the rest by id, so a rate limit never drops them.
+func orderedSkills(selected map[string]skills.Skill) []skills.Skill {
+	out := make([]skills.Skill, 0, len(selected))
+	for _, sk := range selected {
+		out = append(out, sk)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if ci, cj := out[i].ID == rules.SkillID, out[j].ID == rules.SkillID; ci != cj {
+			return ci
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+// addCustomRules adds the owner's own rules as an AI skill; a failure only skips them.
+func (s *Service) addCustomRules(ctx context.Context, reviewID string, selected map[string]skills.Skill) {
+	if s.aiProvider == nil {
+		return
+	}
+	rs, err := s.recorder.ReviewRules(ctx, reviewID)
+	if err != nil {
+		slog.Warn("could not read the review's rules; skipping them", "review", reviewID, "error", err)
+		return
+	}
+	if sk, ok := rules.Skill(rs); ok {
+		selected[sk.ID] = sk
+	}
+}
+
 // hasAICheck reports whether any selected skill defines a kind: ai check.
 func hasAICheck(selected map[string]skills.Skill) bool {
 	for _, sk := range selected {
@@ -160,7 +192,7 @@ func hasAICheck(selected map[string]skills.Skill) bool {
 // one flaky or rate-limited call should not throw them away.
 func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, files []review.ChangedFile, related []ai.ContextSnippet) []review.Finding {
 	var out []review.Finding
-	for _, sk := range selected {
+	for _, sk := range orderedSkills(selected) {
 		var checks []skills.Check
 		for _, c := range sk.Checks {
 			if c.Kind == skills.KindAI {

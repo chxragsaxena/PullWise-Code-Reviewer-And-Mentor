@@ -16,9 +16,11 @@ import (
 
 // fakeStore is an in-memory ReviewStore and ReviewRecorder.
 type fakeStore struct {
-	mu      sync.Mutex
-	nextID  int
-	reviews map[string]*review.Review
+	mu       sync.Mutex
+	nextID   int
+	reviews  map[string]*review.Review
+	rules    map[string][]review.Rule // review id -> rules snapshot
+	rulesErr error
 }
 
 func newFakeStore() *fakeStore { return &fakeStore{reviews: map[string]*review.Review{}} }
@@ -70,6 +72,12 @@ func (f *fakeStore) GetFinding(_ context.Context, reviewID, findingID string) (r
 		}
 	}
 	return review.Finding{}, review.ErrFindingNotFound
+}
+
+func (f *fakeStore) ReviewRules(_ context.Context, reviewID string) ([]review.Rule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.rules[reviewID], f.rulesErr
 }
 
 func (f *fakeStore) active(id string) (*review.Review, error) {

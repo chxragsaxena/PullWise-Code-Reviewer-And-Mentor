@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 )
 
 func inputWithContext(t *testing.T, snippets ...ContextSnippet) ReviewInput {
@@ -13,6 +14,19 @@ func inputWithContext(t *testing.T, snippets ...ContextSnippet) ReviewInput {
 		Skill: sk, Checks: sk.Checks,
 		Files:   []review.ChangedFile{{Path: "worker.go", Patch: "+go func() {}()"}},
 		Context: snippets,
+	}
+}
+
+func TestPromptCarriesAnInMemorySkillsRuleTitlesAndInstructions(t *testing.T) {
+	sk := skills.NewInline("custom", "Your standards", "User rules.", []string{"*"},
+		[]skills.Check{{ID: "rule-7", Title: "Wrap errors", Kind: skills.KindAI, Severity: review.SeverityHigh, Lesson: "rule-7"}},
+		map[string]string{"rule-7": "**Your rule:** Return errors with fmt.Errorf and %w."})
+	got := buildPrompt(ReviewInput{Skill: sk, Checks: sk.Checks, Files: []review.ChangedFile{{Path: "a.go", Patch: "+x"}}})
+
+	for _, want := range []string{"# Skill: Your standards", "Wrap errors (checkId: rule-7)", "Return errors with fmt.Errorf and %w."} {
+		if !strings.Contains(got, want) {
+			t.Errorf("prompt is missing %q", want)
+		}
 	}
 }
 

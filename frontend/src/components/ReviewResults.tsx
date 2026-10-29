@@ -18,6 +18,7 @@ import "./ReviewResults.css";
 const GROUPS: { group: SkillGroup; label: string }[] = [
   { group: "language", label: "Language" },
   { group: "design", label: "Design" },
+  { group: "standards", label: "Your standards" },
 ];
 
 export function ReviewResults({ review }: { review: Review }) {

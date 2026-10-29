@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -29,6 +31,7 @@ type GroqProvider struct {
 	systemPrompt string
 	baseURL      string
 	http         *http.Client
+	sleep        func(ctx context.Context, d time.Duration) error
 }
 
 // GroqOption configures a GroqProvider.
@@ -56,6 +59,7 @@ func NewGroqProvider(apiKey string, opts ...GroqOption) *GroqProvider {
 		systemPrompt: defaultSystemPrompt,
 		baseURL:      groqDefaultBaseURL,
 		http:         &http.Client{Timeout: 60 * time.Second},
+		sleep:        sleepContext,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -168,39 +172,92 @@ func (p *GroqProvider) Review(ctx context.Context, input ReviewInput) ([]Finding
 	return toFindings(parsed), nil
 }
 
+// maxRateLimitWait is the longest we pause for a rate limit; a longer wait fails the call.
+const maxRateLimitWait = 30 * time.Second
+
+// maxRateLimitRetries is how many times a rate-limited call is retried.
+const maxRateLimitRetries = 2
+
+var retryInMessage = regexp.MustCompile(`try again in ([0-9.]+)s`)
+
+// do sends the request, waiting out Groq's per-minute rate limit (429) and retrying.
 func (p *GroqProvider) do(ctx context.Context, body groqRequest) (*groqResponse, error) {
+	for attempt := 0; ; attempt++ {
+		resp, wait, err := p.send(ctx, body)
+		if wait == 0 || attempt >= maxRateLimitRetries {
+			return resp, err
+		}
+		if wait > maxRateLimitWait {
+			return nil, err
+		}
+		if sleepErr := p.sleep(ctx, wait); sleepErr != nil {
+			return nil, sleepErr
+		}
+	}
+}
+
+// retryDelay reads how long Groq asks us to wait: the Retry-After header, else the message text.
+func retryDelay(h http.Header, message string) time.Duration {
+	if secs, err := strconv.ParseFloat(h.Get("Retry-After"), 64); err == nil && secs > 0 {
+		return time.Duration(secs*float64(time.Second)) + 250*time.Millisecond
+	}
+	if m := retryInMessage.FindStringSubmatch(message); m != nil {
+		if secs, err := strconv.ParseFloat(m[1], 64); err == nil && secs > 0 {
+			return time.Duration(secs*float64(time.Second)) + 250*time.Millisecond
+		}
+	}
+	return 5 * time.Second
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
+// send makes one request. wait is non-zero when the call was rate limited and may be retried.
+func (p *GroqProvider) send(ctx context.Context, body groqRequest) (result *groqResponse, wait time.Duration, err error) {
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("encode request: %w", err)
+		return nil, 0, fmt.Errorf("encode request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+"/chat/completions", bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		return nil, 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 
 	resp, err := p.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request groq: %w", err)
+		return nil, 0, fmt.Errorf("request groq: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, 0, fmt.Errorf("read response: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		var errBody groqErrorBody
 		_ = json.Unmarshal(respBody, &errBody) // best-effort; the status code is what matters
-		return nil, &GroqAPIError{StatusCode: resp.StatusCode, Type: errBody.Error.Type, Message: errBody.Error.Message}
+		apiErr := &GroqAPIError{StatusCode: resp.StatusCode, Type: errBody.Error.Type, Message: errBody.Error.Message}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, retryDelay(resp.Header, errBody.Error.Message), apiErr
+		}
+		return nil, 0, apiErr
 	}
 
-	var result groqResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+	var parsed groqResponse
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return nil, 0, fmt.Errorf("decode response: %w", err)
 	}
-	return &result, nil
+	return &parsed, 0, nil
 }

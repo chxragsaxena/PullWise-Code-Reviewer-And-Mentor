@@ -160,6 +160,25 @@ valid session cookie is "signed in":
 - Reviews created while signed out have no owner and stay public, exactly as in V1.
 - The GitHub token is never stored on the review or returned by any endpoint.
 
+## Your standards (rules a user writes)
+
+Signed-in users can write review rules in plain English; the AI checks their reviews
+against them. Every route needs a session (`401 unauthorized` otherwise).
+
+```json
+{ "id": "7", "title": "Wrap errors", "instructions": "Return errors with fmt.Errorf and %w.", "severity": "high", "enabled": true }
+```
+
+- `GET /api/rules`: `{ "rules": Rule[] }`, oldest first.
+- `POST /api/rules`: body is a rule without `id` (`enabled` defaults to true). `201` with the rule.
+- `PUT /api/rules/{id}`: replaces the rule. `DELETE /api/rules/{id}`: `204`.
+- Limits: title 1 to 120 characters, instructions 1 to 1,000, severity one of
+  `critical`, `high`, `medium`, `suggestion`, at most 20 rules per user (`409 limit_reached`).
+  Invalid input is `400 invalid_rule`. Someone else's rule is `404 rule_not_found`.
+- A review copies the owner's enabled rules when it starts, so later edits never change it.
+  Findings from them use skill id `custom` ("Your standards"), take the rule's severity, and
+  show the rule's instructions as their lesson.
+
 ## Not in v1
 Private-repository access (added in V2, above), deleting reviews, sharing a private
 review, pagination beyond `limit`,

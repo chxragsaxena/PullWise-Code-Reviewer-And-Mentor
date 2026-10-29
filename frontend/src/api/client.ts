@@ -1,4 +1,4 @@
-import type { AuthUser, FindingDetail, Review, ReviewStatusEvent, ReviewSummary } from "./types";
+import type { AuthUser, FindingDetail, Review, ReviewStatusEvent, ReviewSummary, Rule, RuleInput } from "./types";
 
 /** Error carrying the backend's stable error code (see docs/api.md). */
 export class ApiError extends Error {
@@ -40,4 +40,10 @@ export interface ApiClient {
   /** Starts GitHub sign-in. The http client navigates the browser away; the mock client simulates success in place. */
   login(): Promise<void>;
   logout(): Promise<void>;
+
+  /** The signed-in user's own standards; rejects with a 401 ApiError when signed out. */
+  listRules(): Promise<Rule[]>;
+  createRule(input: RuleInput): Promise<Rule>;
+  updateRule(id: string, input: RuleInput): Promise<Rule>;
+  deleteRule(id: string): Promise<void>;
 }

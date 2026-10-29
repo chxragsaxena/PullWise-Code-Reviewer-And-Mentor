@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ApiProvider } from "../api/ApiProvider";
 import { createMockClient } from "../api/mockClient";
@@ -10,7 +11,9 @@ const fastClient = () => createMockClient({ latencyMs: 0, stepDelayMs: 1 });
 function renderAuthStatus(client = fastClient()) {
   render(
     <ApiProvider client={client}>
-      <AuthStatus />
+      <MemoryRouter>
+        <AuthStatus />
+      </MemoryRouter>
     </ApiProvider>,
   );
   return client;
@@ -31,6 +34,15 @@ describe("AuthStatus", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByRole("button", { name: "Sign in with GitHub" })).toBeInTheDocument();
+  });
+
+  it("links to the standards page only when signed in", async () => {
+    renderAuthStatus();
+    await screen.findByRole("button", { name: "Sign in with GitHub" });
+    expect(screen.queryByRole("link", { name: "Standards" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Sign in with GitHub" }));
+    expect(await screen.findByRole("link", { name: "Standards" })).toHaveAttribute("href", "/standards");
   });
 
   it("reflects a user already signed in on mount", async () => {

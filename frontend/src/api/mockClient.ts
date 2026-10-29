@@ -7,7 +7,10 @@ import type {
   ReviewStatusEvent,
   ReviewStatus,
   ReviewSummary,
+  Rule,
+  RuleInput,
 } from "./types";
+import { RULE_LIMITS } from "./types";
 import { countBySeverity } from "../lib/findings";
 import { parsePrUrl } from "../lib/prUrl";
 
@@ -63,6 +66,22 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
   const store = new Map<string, StoredReview>();
   let nextId = 1;
   let currentUser: AuthUser | null = null;
+  let rules: Rule[] = [];
+  let nextRuleId = 1;
+
+  function signedIn() {
+    if (!currentUser) throw new ApiError("unauthorized", "Sign in to manage your standards.", 401);
+  }
+
+  function validRule(input: RuleInput) {
+    const { maxTitle, maxInstructions } = RULE_LIMITS;
+    if (!input.title.trim() || input.title.length > maxTitle) {
+      throw new ApiError("invalid_rule", `The title must be 1 to ${maxTitle} characters.`, 400);
+    }
+    if (!input.instructions.trim() || input.instructions.length > maxInstructions) {
+      throw new ApiError("invalid_rule", `The instructions must be 1 to ${maxInstructions} characters.`, 400);
+    }
+  }
 
   function respond<T>(produce: () => T): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -209,6 +228,46 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
     logout() {
       return respond(() => {
         currentUser = null;
+        rules = [];
+      });
+    },
+
+    listRules() {
+      return respond(() => {
+        signedIn();
+        return snapshot(rules);
+      });
+    },
+
+    createRule(input) {
+      return respond(() => {
+        signedIn();
+        validRule(input);
+        if (rules.length >= RULE_LIMITS.maxRules) {
+          throw new ApiError("limit_reached", "You can have at most 20 standards. Delete one to add another.", 409);
+        }
+        const rule: Rule = { ...input, title: input.title.trim(), instructions: input.instructions.trim(), id: String(nextRuleId++) };
+        rules.push(rule);
+        return snapshot(rule);
+      });
+    },
+
+    updateRule(id, input) {
+      return respond(() => {
+        signedIn();
+        validRule(input);
+        const index = rules.findIndex((r) => r.id === id);
+        if (index < 0) throw new ApiError("rule_not_found", "That rule does not exist.", 404);
+        rules[index] = { ...input, title: input.title.trim(), instructions: input.instructions.trim(), id };
+        return snapshot(rules[index]!);
+      });
+    },
+
+    deleteRule(id) {
+      return respond(() => {
+        signedIn();
+        if (!rules.some((r) => r.id === id)) throw new ApiError("rule_not_found", "That rule does not exist.", 404);
+        rules = rules.filter((r) => r.id !== id);
       });
     },
   };

@@ -18,6 +18,11 @@
   white-space: nowrap;
 }
 
+.auth-status__link {
+  margin-right: var(--space-2);
+  font-weight: 600;
+}
+
 @media (max-width: 40rem) {
   .auth-status__login-name {
     display: none;
