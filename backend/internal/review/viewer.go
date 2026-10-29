@@ -4,10 +4,7 @@ import "context"
 
 type viewerKey struct{}
 
-// WithViewer returns a context carrying the signed-in user making the request.
-// Reviews created under it are private to that user, and only that user (plus
-// anyone, for anonymous reviews) can read them back. An empty id means
-// anonymous.
+// WithViewer returns a context carrying the signed-in user; an empty id means anonymous.
 func WithViewer(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, viewerKey{}, userID)
 }

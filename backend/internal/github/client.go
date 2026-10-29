@@ -57,22 +57,19 @@ func (e *APIError) Is(target error) bool {
 
 // PullRequest is the metadata of a pull request.
 type PullRequest struct {
-	Ref     PullRequestRef
-	Title   string
-	Author  string
-	URL     string
-	State   string
-	HeadSHA string
-	// BaseSHA is the commit the pull request branches from: the codebase as it
-	// stands without the change, shared by every PR against the same base.
+	Ref          PullRequestRef
+	Title        string
+	Author       string
+	URL          string
+	State        string
+	HeadSHA      string
 	BaseSHA      string
 	FilesChanged int
 	Additions    int
 	Deletions    int
 }
 
-// ChangedFile is one file in a pull request. Patch is empty for binary files and
-// for diffs GitHub considers too large.
+// ChangedFile is one file in a pull request.
 type ChangedFile struct {
 	Path      string
 	Status    string
@@ -148,8 +145,6 @@ func (c *Client) FetchPullRequest(ctx context.Context, ref PullRequestRef) (Pull
 	}, nil
 }
 
-// ListFiles returns every file changed by the pull request, following pagination
-// up to GitHub's limit of 3000 files.
 func (c *Client) ListFiles(ctx context.Context, ref PullRequestRef) ([]ChangedFile, error) {
 	var files []ChangedFile
 	for page := 1; len(files) < maxFiles; page++ {
@@ -226,8 +221,6 @@ func (c *Client) getJSON(ctx context.Context, path string, query url.Values, out
 	return nil
 }
 
-// get performs a GET and returns the response only for 2xx statuses.
-// The caller closes the body.
 func (c *Client) get(ctx context.Context, path string, query url.Values, accept string) (*http.Response, error) {
 	target := c.baseURL + path
 	if len(query) > 0 {
@@ -241,8 +234,6 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, accept 
 	req.Header.Set("Accept", accept)
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "pullwise")
-	// A signed-in user's own token wins over the server-wide one, so their
-	// private repositories are reachable and their rate limit is used.
 	token := c.token
 	if t := RequestToken(ctx); t != "" {
 		token = t

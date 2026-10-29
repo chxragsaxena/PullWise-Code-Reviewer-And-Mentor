@@ -14,12 +14,8 @@ import (
 	"time"
 )
 
-// scope grants read/write access to the repositories the user can see,
-// public and private — needed to review a private repo on the user's behalf.
 const scope = "repo"
 
-// OAuth drives the GitHub OAuth App login flow: the authorize redirect, the
-// code-for-token exchange, and reading the logged-in user's profile.
 type OAuth struct {
 	clientID     string
 	clientSecret string
@@ -38,8 +34,6 @@ type Option func(*OAuth)
 // WithHTTPClient replaces the underlying HTTP client.
 func WithHTTPClient(c *http.Client) Option { return func(o *OAuth) { o.httpClient = c } }
 
-// WithEndpoints overrides all three GitHub endpoints at once (used by tests
-// to point everything at one httptest server).
 func WithEndpoints(authorizeURL, tokenURL, userURL string) Option {
 	return func(o *OAuth) { o.authorizeURL, o.tokenURL, o.userURL = authorizeURL, tokenURL, userURL }
 }
@@ -61,9 +55,7 @@ func NewOAuth(clientID, clientSecret, redirectURL string, opts ...Option) *OAuth
 	return o
 }
 
-// NewState returns a random CSRF state value for the authorize redirect. The
-// caller stores it (e.g. in a short-lived cookie) and checks it against the
-// callback's state parameter before trusting the callback at all.
+// NewState returns a random CSRF state value for the authorize redirect.
 func NewState() (string, error) {
 	b := make([]byte, 24)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
@@ -83,8 +75,7 @@ func (o *OAuth) AuthorizeURL(state string) string {
 	return o.authorizeURL + "?" + q.Encode()
 }
 
-// Token is what GitHub returns from the code exchange. RefreshToken and
-// ExpiresAt are zero unless the OAuth App has "Expire user access tokens" on.
+// Token is what GitHub returns from the code exchange.
 type Token struct {
 	AccessToken  string
 	RefreshToken string
@@ -101,9 +92,7 @@ func (o *OAuth) Exchange(ctx context.Context, code string) (Token, error) {
 	})
 }
 
-// Refresh trades a refresh token for a new access token. GitHub rotates the
-// refresh token: the one passed in stops working, so the caller must save the
-// returned one.
+// Refresh trades a refresh token for a new access token.
 func (o *OAuth) Refresh(ctx context.Context, refreshToken string) (Token, error) {
 	return o.requestToken(ctx, url.Values{
 		"client_id":     {o.clientID},
@@ -113,8 +102,6 @@ func (o *OAuth) Refresh(ctx context.Context, refreshToken string) (Token, error)
 	})
 }
 
-// requestToken posts to GitHub's token endpoint, which reports failures as a
-// 200 response with an "error" field.
 func (o *OAuth) requestToken(ctx context.Context, form url.Values) (Token, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -162,9 +149,7 @@ type Profile struct {
 	AvatarURL string
 }
 
-// User is a logged-in user, as the store persists and returns them. Defined
-// here (not in internal/store) so internal/store's methods can return it
-// directly without internal/auth importing internal/store back.
+// User is a logged-in user, as the store persists and returns them.
 type User struct {
 	ID          string
 	GitHubLogin string
@@ -172,9 +157,7 @@ type User struct {
 	AvatarURL   string
 }
 
-// Tokens is one user's encrypted GitHub OAuth tokens, as stored and
-// retrieved. RefreshEnc and ExpiresAt are nil for a grant that does not
-// expire (a classic OAuth App token).
+// Tokens is one user's encrypted GitHub OAuth tokens, as stored and retrieved.
 type Tokens struct {
 	AccessEnc  []byte
 	RefreshEnc []byte

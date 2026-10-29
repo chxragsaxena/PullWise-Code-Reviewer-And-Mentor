@@ -10,13 +10,9 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// DefaultModel is the model used unless overridden. The user asked for Sonnet
-// specifically, which is why this deviates from Opus, the usual default.
+// DefaultModel is the model used unless overridden.
 const DefaultModel = "claude-sonnet-5"
 
-// reportFindingsTool builds the tool definition from the shared schema
-// (schema.go). It's a function, not a package var, so the ExtraFields map is
-// never shared/mutated across calls.
 func reportFindingsTool() anthropic.ToolParam {
 	schema := findingsObjectSchema()
 	return anthropic.ToolParam{
@@ -36,9 +32,7 @@ type ClaudeProvider struct {
 	client       *anthropic.Client
 	model        anthropic.Model
 	systemPrompt string
-	// requestOpts accumulates options (e.g. a test base URL) applied before
-	// the client is built in NewClaudeProvider.
-	requestOpts []option.RequestOption
+	requestOpts  []option.RequestOption
 }
 
 // ClaudeOption configures a ClaudeProvider.
@@ -71,10 +65,6 @@ func NewClaudeProvider(apiKey string, opts ...ClaudeOption) *ClaudeProvider {
 	return p
 }
 
-// Review asks Claude to evaluate one skill's AI checks against the changed
-// files and returns what it reported. It forces the report_findings tool with
-// a strict schema, so the response is always well-formed JSON — there is no
-// prose to parse.
 func (p *ClaudeProvider) Review(ctx context.Context, input ReviewInput) ([]Finding, error) {
 	if len(input.Checks) == 0 {
 		return nil, nil

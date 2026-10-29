@@ -63,7 +63,7 @@ function groupOf(skillId: string): SkillGroup {
   return DESIGN_SKILL_ORDER.includes(skillId) ? "design" : "language";
 }
 
-/** Skills that produced findings for a filter menu: language (A-Z), then REST, SOLID, then your standards. */
+/** Skills for the filter menu: languages (A-Z), then REST, SOLID, then your standards. */
 export function uniqueSkills(findings: readonly Finding[]): SkillOption[] {
   const found = new Map<string, SkillOption>();
   for (const f of findings) {

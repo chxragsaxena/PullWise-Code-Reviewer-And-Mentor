@@ -8,16 +8,8 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// maxPromptChars bounds how much diff text goes into one request. GitHub
-// truncates very large patches on its own, but a PR with many changed files
-// can still add up to more tokens than is sensible to send in one call; this
-// is a coarse budget until a smarter per-file or chunked strategy is needed
-// (see the tracker's known risks).
 const maxPromptChars = 40_000
 
-// buildPrompt turns a skill's AI checks and a set of changed files into the
-// user message sent to the model. It embeds each check's lesson text, so the
-// model reviews using the same material the product teaches from.
 func buildPrompt(input ReviewInput) string {
 	var b strings.Builder
 
@@ -51,9 +43,6 @@ func buildPrompt(input ReviewInput) string {
 // maxContextChars bounds the related-code section, separately from the diff budget.
 const maxContextChars = 8_000
 
-// writeContext appends related code from the rest of the repository. It is
-// repository content, which anyone who can open a pull request can influence, so
-// the model is told to treat it as data to read, never as instructions.
 func writeContext(b *strings.Builder, snippets []ContextSnippet) {
 	if len(snippets) == 0 {
 		return
@@ -74,10 +63,6 @@ func writeContext(b *strings.Builder, snippets []ContextSnippet) {
 	}
 }
 
-// writeFiles appends each file's diff, stopping once the shared budget is
-// spent so one large PR cannot blow out the request. Diffs are sent rather
-// than full file content: they are what changed, they are already a fraction
-// of the size, and they are what a human reviewer would actually read first.
 func writeFiles(b *strings.Builder, files []review.ChangedFile) {
 	budget := maxPromptChars
 	for i, f := range files {

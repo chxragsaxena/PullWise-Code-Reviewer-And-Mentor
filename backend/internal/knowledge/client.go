@@ -1,6 +1,4 @@
-// Package knowledge is the client for the separate pullwise-knowledge service,
-// which indexes a repository's code and finds the parts related to a query. Calls
-// are authenticated with short-lived signed tokens, and optionally over mutual TLS.
+// Package knowledge is the client for the separate pullwise-knowledge repo-context service.
 package knowledge
 
 import (
@@ -45,7 +43,7 @@ type Snippet struct {
 
 // IndexResult says what an index call did.
 type IndexResult struct {
-	Status string `json:"status"` // "indexed", or "unchanged" if that commit was already indexed
+	Status string `json:"status"`
 	Files  int    `json:"files"`
 	Chunks int    `json:"chunks"`
 }
@@ -74,8 +72,7 @@ type Client struct {
 // Option configures a Client.
 type Option func(*Client)
 
-// WithTLS sets the TLS configuration, e.g. a client certificate for mutual TLS
-// and the CA that signed the server's certificate.
+// WithTLS sets the TLS configuration, e.g.
 func WithTLS(cfg *tls.Config) Option {
 	return func(c *Client) { c.http = &http.Client{Transport: &http.Transport{TLSClientConfig: cfg}} }
 }
@@ -83,9 +80,7 @@ func WithTLS(cfg *tls.Config) Option {
 // WithHTTPClient replaces the HTTP client (used by tests).
 func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.http = h } }
 
-// New builds a Client for the service at baseURL. secret must be the same value
-// the service is configured to verify with; issuer and audience must match its
-// settings.
+// New builds a Client for the service at baseURL.
 func New(baseURL string, secret []byte, issuer, audience string, opts ...Option) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
@@ -106,8 +101,6 @@ func New(baseURL string, secret []byte, issuer, audience string, opts ...Option)
 
 type requestIDKey struct{}
 
-// WithRequestID returns a context whose knowledge calls carry id as X-Request-ID,
-// so one review can be followed across both services' logs.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, requestIDKey{}, id)
 }
@@ -122,8 +115,6 @@ func (c *Client) Index(ctx context.Context, tenant, repo, ref string, files []Fi
 	return out, err
 }
 
-// Search returns up to topK snippets of the repository related to query,
-// leaving out excludePaths (the files the caller already has in full).
 func (c *Client) Search(ctx context.Context, tenant, repo, query string, topK int, excludePaths []string) ([]Snippet, error) {
 	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 	defer cancel()
@@ -137,8 +128,6 @@ func (c *Client) Search(ctx context.Context, tenant, repo, query string, topK in
 	return out.Results, nil
 }
 
-// IndexedRef returns the commit of repo ("owner/name") currently indexed for the
-// tenant, so a caller can skip downloading and re-sending an up-to-date repo.
 func (c *Client) IndexedRef(ctx context.Context, tenant, repo string) (string, bool, error) {
 	owner, name, ok := strings.Cut(repo, "/")
 	if !ok {
@@ -208,9 +197,6 @@ func (c *Client) do(ctx context.Context, method, path, tenant string, scopes []s
 	return nil
 }
 
-// token signs a short-lived HS256 JWT for one call. (Signing is a few lines of
-// standard library; verification, where mistakes are dangerous, lives in the
-// knowledge service and uses a vetted library.)
 func (c *Client) token(tenant string, scopes []string) (string, error) {
 	if tenant == "" {
 		return "", errors.New("a tenant is required")

@@ -1,6 +1,4 @@
-/* Design tokens. Components use these variables and never hard-code colors.
-   Light is the default; dark applies when the system prefers it, unless the
-   user picked a theme with the toggle (data-theme on <html>). */
+/* Design tokens; dark follows the system unless data-theme on <html> overrides it. */
 
 :root {
   color-scheme: light;

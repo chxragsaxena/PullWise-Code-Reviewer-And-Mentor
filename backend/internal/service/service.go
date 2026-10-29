@@ -1,5 +1,4 @@
-// Package service runs reviews: it accepts a pull request link, records a
-// review and processes it in the background, and serves what was found.
+// Package service accepts pull request links, runs reviews in the background and serves results.
 package service
 
 import (
@@ -55,24 +54,18 @@ type PullRequestSource interface {
 type Config struct {
 	Skills    []skills.Skill
 	Analyzers []review.StaticAnalyzer
-	// AIProvider evaluates each selected skill's kind: ai checks. Nil disables
-	// the AI pass entirely: reviews go straight from analyzing to completed,
-	// exactly as before this existed.
+	// AIProvider evaluates each skill's AI checks. Nil disables the AI pass.
 	AIProvider ai.Provider
-	// Knowledge gives the AI pass related code from the rest of the repository.
-	// Nil disables it: reviews see only the diff, as before it existed.
+	// Knowledge gives the AI pass related code from the repository. Nil disables it.
 	Knowledge Knowledge
 
-	// MaxConcurrent is how many reviews run at once, i.e. the number of workers
-	// (default 2).
+	// MaxConcurrent is how many reviews run at once (default 2).
 	MaxConcurrent int
-	// MaxPending is how many reviews may wait in the queue for a free worker
-	// before new ones are refused with ErrBusy (default 50).
+	// MaxPending is how many reviews may queue before ErrBusy (default 50).
 	MaxPending int
 	// ReviewTimeout bounds one review from start to finish (default 5 minutes).
 	ReviewTimeout time.Duration
-	// MaxFilesToAnalyze caps how many source files are downloaded and analyzed
-	// per review (default 100).
+	// MaxFilesToAnalyze caps source files downloaded per review (default 100).
 	MaxFilesToAnalyze int
 }
 
@@ -110,18 +103,16 @@ type Service struct {
 
 	mu       sync.Mutex // guards closed, reserved and sends on jobs
 	closed   bool
-	reserved int // queue slots claimed by Create calls still writing their record
+	reserved int // queue slots held by Create calls mid-write
 }
 
 // job is one queued review.
 type job struct {
 	id  string
 	ref github.PullRequestRef
-	// token is the creating user's own GitHub token, if they were signed in.
-	// It lives only in memory for the life of the job and is never stored.
+	// token is the creating user's GitHub token; kept in memory only, never stored.
 	token string
-	// viewer is the creating user's id ("" if anonymous): it decides whose
-	// knowledge-base index the review uses.
+	// viewer is the creating user's id ("" if anonymous); it picks the knowledge index.
 	viewer string
 }
 
@@ -162,17 +153,14 @@ func (s *Service) worker() {
 	}
 }
 
-// Create validates the link, records a queued review and starts processing it
-// in the background. It returns as soon as the record exists; it never waits
-// for GitHub or the analysis.
+// Create validates the link, records a queued review and starts it in the background.
 func (s *Service) Create(ctx context.Context, prURL string) (review.Review, error) {
 	ref, err := github.ParsePRURL(prURL)
 	if err != nil {
 		return review.Review{}, err
 	}
 
-	// Reserve a queue slot first, so a refused request never leaves a review
-	// behind and the enqueue below can never block.
+	// Reserve a queue slot first so a refused request leaves no review behind.
 	s.mu.Lock()
 	switch {
 	case s.closed:
@@ -188,8 +176,7 @@ func (s *Service) Create(ctx context.Context, prURL string) (review.Review, erro
 	// The database write happens outside the lock so requests do not serialize.
 	rv, err := s.store.CreateReview(ctx, ref.Owner, ref.Repo, ref.Number)
 
-	// Close closes the queue under this lock, so checking closed here means we
-	// can never send on a closed channel.
+	// Close closes the queue under this lock, so we never send on a closed channel.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.reserved--
@@ -201,8 +188,7 @@ func (s *Service) Create(ctx context.Context, prURL string) (review.Review, erro
 		s.failUnstarted(rv.ID)
 		return review.Review{}, ErrShuttingDown
 	}
-	// Room is guaranteed by the reservation. The token comes from the request
-	// context, set by the HTTP layer for signed-in users.
+	// Room is guaranteed by the reservation.
 	s.jobs <- job{id: rv.ID, ref: ref, token: github.RequestToken(ctx), viewer: review.ViewerFrom(ctx)}
 	return rv, nil
 }
@@ -229,8 +215,7 @@ func (s *Service) Get(ctx context.Context, id string) (review.Review, error) {
 	return rv, nil
 }
 
-// List returns recent reviews, newest first. limit is clamped to 1..50, with
-// 20 used when it is not positive.
+// List returns recent reviews, newest first. limit is clamped to 1..50 (default 20).
 func (s *Service) List(ctx context.Context, limit int) ([]review.Review, error) {
 	switch {
 	case limit <= 0:
@@ -325,16 +310,13 @@ func (s *Service) enrichWith(f review.Finding, custom *skills.Skill) review.Find
 type Stream struct {
 	// Current is the status at the moment of subscribing.
 	Current review.Event
-	// Events delivers later changes. It is nil when Current is already terminal,
-	// and is closed if the subscriber falls behind (reconnect to resume).
+	// Events delivers later changes; nil when Current is terminal, closed if the subscriber lags.
 	Events <-chan review.Event
 	// Close stops the stream. It is always safe to call.
 	Close func()
 }
 
-// Watch subscribes to a review's status changes. The subscription starts before
-// the current status is read, so no change can be missed in between; a change
-// may be reported twice, which callers should tolerate.
+// Watch subscribes before reading the current status, so no change is missed (one may repeat).
 func (s *Service) Watch(ctx context.Context, id string) (*Stream, error) {
 	events, cancel := s.broker.Subscribe(id)
 
@@ -352,10 +334,7 @@ func (s *Service) Watch(ctx context.Context, id string) (*Stream, error) {
 	return &Stream{Current: current, Events: events, Close: cancel}, nil
 }
 
-// Close stops accepting reviews and waits for queued and running ones to
-// finish. If ctx ends first, the remaining reviews are cancelled and marked
-// failed ("interrupted"), and Close returns ctx's error once the workers have
-// wound down. Close may be called more than once.
+// Close stops accepting reviews and waits for in-flight ones; if ctx ends first it cancels them.
 func (s *Service) Close(ctx context.Context) error {
 	s.mu.Lock()
 	if !s.closed {

@@ -27,9 +27,6 @@ type API struct {
 	heartbeat time.Duration
 	create    *limiter // nil when rate limiting is off
 
-	// auth is nil when GitHub login is not configured — every /auth/*
-	// handler then degrades to "not logged in" or 404, matching the
-	// project's pattern for optional features (GITHUB_TOKEN, GROQ_API_KEY).
 	auth          AuthService
 	frontendURL   string
 	secureCookies bool
@@ -49,13 +46,9 @@ func WithReadiness(check func(context.Context) error) Option {
 	return func(a *API) { a.ready = check }
 }
 
-// WithHeartbeat sets how often an idle event stream sends a keep-alive comment
-// (default 15s), so proxies do not close it.
 func WithHeartbeat(d time.Duration) Option { return func(a *API) { a.heartbeat = d } }
 
-// WithCreateRateLimit limits POST /api/reviews per client address. perMinute <= 0
-// turns the limit off. The client address is the connection's remote address; behind
-// a reverse proxy every client shares the proxy's address.
+// WithCreateRateLimit limits POST /api/reviews per client address.
 func WithCreateRateLimit(perMinute, burst int) Option {
 	return func(a *API) {
 		if perMinute > 0 && burst > 0 {
@@ -66,9 +59,7 @@ func WithCreateRateLimit(perMinute, burst int) Option {
 	}
 }
 
-// WithAuth enables GitHub login. frontendURL is where the browser is sent
-// after a successful login; secureCookies marks session/state cookies
-// Secure, which requires HTTPS — leave this off for local HTTP development.
+// WithAuth enables GitHub login.
 func WithAuth(svc AuthService, frontendURL string, secureCookies bool) Option {
 	return func(a *API) { a.auth, a.frontendURL, a.secureCookies = svc, frontendURL, secureCookies }
 }
@@ -83,8 +74,7 @@ func New(svc ReviewService, opts ...Option) *API {
 	return a
 }
 
-// BeginShutdown ends open event streams so http.Server.Shutdown is not held up
-// by them. Register it with http.Server.RegisterOnShutdown.
+// BeginShutdown ends open event streams so http.Server.Shutdown is not held up by them.
 func (a *API) BeginShutdown() { a.doneOnce.Do(func() { close(a.done) }) }
 
 // Handler returns the router with its middleware.

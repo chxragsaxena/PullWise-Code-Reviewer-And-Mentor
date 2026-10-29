@@ -10,10 +10,6 @@ import (
 
 // --- loose-equality ----------------------------------------------------------
 
-// checkLooseEquality flags `==`/`!=`, which coerce types before comparing,
-// in favor of `===`/`!==`. node is any binary_expression; non-matching
-// operators (including the strict forms, which are a different token text)
-// are ignored.
 func checkLooseEquality(src *source, node *sitter.Node) (review.Finding, bool) {
 	op := node.ChildByFieldName("operator")
 	if op == nil || (op.Type() != "==" && op.Type() != "!=") {
@@ -37,8 +33,6 @@ func strictForm(op string) string {
 
 // --- any-type ------------------------------------------------------------
 
-// checkAnyType flags an explicit `any` type annotation, which opts a value
-// out of type checking. node is any predefined_type node.
 func checkAnyType(src *source, node *sitter.Node) (review.Finding, bool) {
 	if src.text(node) != "any" {
 		return review.Finding{}, false
@@ -68,9 +62,6 @@ func checkAnyType(src *source, node *sitter.Node) (review.Finding, bool) {
 
 // --- console-log-left-in --------------------------------------------------
 
-// checkConsoleLog flags a direct console.log(...) call. console.error/warn
-// are left alone, since those are plausibly intentional logging rather than
-// debug output left behind by mistake.
 func checkConsoleLog(src *source, call *sitter.Node) (review.Finding, bool) {
 	fn := call.ChildByFieldName("function")
 	if fn == nil || fn.Type() != "member_expression" {
@@ -91,15 +82,6 @@ func checkConsoleLog(src *source, call *sitter.Node) (review.Finding, bool) {
 
 // --- unhandled-promise ------------------------------------------------------
 
-// checkUnhandledPromise flags a `.then(...)` chain used as a bare statement
-// with no `.catch(...)` — its rejection has nowhere to go. node is any
-// expression_statement.
-//
-// This is a syntactic heuristic: it cannot tell whether `.then` is really a
-// Promise method or an unrelated method of the same name, and it does not
-// look inside `try`/`catch` or check for `await` — an awaited chain inside a
-// try block is not a problem, but is not specifically recognized as safe
-// either, so it can still be flagged.
 func checkUnhandledPromise(src *source, stmt *sitter.Node) (review.Finding, bool) {
 	if stmt.NamedChildCount() != 1 {
 		return review.Finding{}, false
@@ -127,11 +109,6 @@ func checkUnhandledPromise(src *source, stmt *sitter.Node) (review.Finding, bool
 
 // --- fetch-without-abort-signal ----------------------------------------------
 
-// checkFetchWithoutSignal flags a bare fetch(url) call, or fetch(url, opts)
-// where opts has no signal property, so the request cannot be cancelled.
-// It only recognizes an inline options object literal: fetch(url, someVar)
-// cannot be checked without knowing someVar's shape, so it is not flagged —
-// favoring fewer false positives over completeness.
 func checkFetchWithoutSignal(src *source, call *sitter.Node) (review.Finding, bool) {
 	fn := call.ChildByFieldName("function")
 	if fn == nil || fn.Type() != "identifier" || src.text(fn) != "fetch" {
@@ -171,12 +148,6 @@ func fetchFinding(src *source, call *sitter.Node) (review.Finding, bool) {
 
 // --- high-complexity ----------------------------------------------------------
 
-// checkHighComplexity flags a function whose cyclomatic complexity exceeds
-// threshold, using the same definition as the go skill's check: start at 1,
-// +1 per branch (if, for, for-in/of, while, do-while, switch case, ternary)
-// and per &&/||. Only function declarations are walked — arrow functions,
-// function expressions and methods are not (a known gap, matching goast's
-// FuncLit gap for Go).
 func checkHighComplexity(src *source, fn *sitter.Node, threshold int) (review.Finding, bool) {
 	body := fn.ChildByFieldName("body")
 	if body == nil {

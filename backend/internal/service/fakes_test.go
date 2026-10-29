@@ -191,8 +191,7 @@ func (s *fakeSource) FileContent(ctx context.Context, _ github.PullRequestRef, p
 	return s.content(ctx, path)
 }
 
-// RepositoryFiles makes fakeSource a RepositorySource: the whole repository at a
-// commit, for the knowledge base.
+// RepositoryFiles makes fakeSource a RepositorySource.
 func (s *fakeSource) RepositoryFiles(_ context.Context, _ github.PullRequestRef, sha string) ([]github.SourceFile, error) {
 	s.mu.Lock()
 	s.archiveShas = append(s.archiveShas, sha)
@@ -268,8 +267,7 @@ checks:
     lesson: errors
 `
 
-// onlyDeterministicSkill is the "go" skill with its ai check removed, for
-// tests that need hasAICheck to be false.
+// onlyDeterministicSkill is the "go" skill with its ai check removed.
 func onlyDeterministicSkill(t *testing.T) []skills.Skill {
 	t.Helper()
 	loaded, err := skills.Load(fstest.MapFS{

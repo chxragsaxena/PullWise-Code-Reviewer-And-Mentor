@@ -12,8 +12,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/skills"
 )
 
-// designSkillYAML is an AI-only skill that applies to every language, like the
-// real solid and rest skills.
+// designSkillYAML is an AI-only skill that applies to every language.
 const designSkillYAML = `
 id: design
 name: Design
@@ -41,9 +40,7 @@ func skillsWithAnyLanguage(t *testing.T) []skills.Skill {
 	return loaded
 }
 
-// A pull request in a language with no analyzer and no language-specific skill
-// must still get the any-language AI skills, and must not be handed to the
-// Go skill.
+// A PR in a language with no analyzer still gets any-language AI skills, not the Go skill.
 func TestAnyLanguageSkillsReviewLanguagesWithoutAnalyzers(t *testing.T) {
 	tests := []struct {
 		name       string

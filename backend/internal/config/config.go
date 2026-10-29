@@ -19,34 +19,20 @@ type Config struct {
 	DatabaseURL string
 	// GitHubToken is optional; it raises GitHub's API rate limit.
 	GitHubToken string
-	// GroqAPIKey enables the AI review pass (kind: ai checks) via Groq. Empty
-	// disables it — reviews stay deterministic-only, exactly as before it existed.
-	GroqAPIKey string
+	GroqAPIKey  string
 
-	// GitHub OAuth (login). Empty ClientID disables login entirely — every
-	// /auth/* route then degrades to "not configured" / "not logged in".
 	GitHubOAuthClientID     string
 	GitHubOAuthClientSecret string
 	GitHubOAuthRedirectURL  string
-	// SessionSecret is the base64-encoded AES-256 key used to encrypt stored
-	// GitHub tokens. Generate 32 random bytes and base64-encode them.
-	SessionSecret string
+	SessionSecret           string
 	// FrontendURL is where the browser is sent after a successful login.
-	FrontendURL string
-	// SecureCookies marks session/state cookies Secure (HTTPS-only). Leave
-	// false for local HTTP development.
+	FrontendURL   string
 	SecureCookies bool
 
-	// The knowledge service (separate repo: pullwise-knowledge) gives the AI
-	// review related code from the rest of the repository. Empty URL disables it.
-	KnowledgeURL string
-	// KnowledgeJWTSecret signs the tokens sent to it; it must equal the secret
-	// the knowledge service verifies with.
+	KnowledgeURL         string
 	KnowledgeJWTSecret   string
 	KnowledgeJWTIssuer   string
 	KnowledgeJWTAudience string
-	// Optional TLS: the CA that signed the service's certificate, and this
-	// service's own certificate and key (for mutual TLS).
 	KnowledgeTLSCAFile   string
 	KnowledgeTLSCertFile string
 	KnowledgeTLSKeyFile  string
@@ -58,14 +44,10 @@ type Config struct {
 	// ReviewTimeout bounds a single review.
 	ReviewTimeout time.Duration
 
-	// CreateRatePerMinute and CreateBurst limit POST /api/reviews per client.
-	// A rate of 0 turns the limit off.
 	CreateRatePerMinute int
 	CreateBurst         int
 }
 
-// Load reads configuration from environment variables, applying defaults, and
-// reports every problem it finds at once rather than one per run.
 func Load() (Config, error) {
 	var errs []error
 	c := Config{

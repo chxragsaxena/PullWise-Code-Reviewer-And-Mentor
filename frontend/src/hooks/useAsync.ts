@@ -8,10 +8,7 @@ export interface AsyncState<T> {
   reload: () => void;
 }
 
-/**
- * Runs `load` when `deps` change and tracks its result. Stale responses from a
- * superseded request are ignored. Existing data stays visible during a reload.
- */
+/** Runs `load` when `deps` change; ignores stale responses and keeps old data while reloading. */
 export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]): AsyncState<T> {
   const [state, setState] = useState<{ data: T | null; error: Error | null; loading: boolean }>({
     data: null,

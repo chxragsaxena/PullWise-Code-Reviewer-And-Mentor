@@ -1,6 +1,4 @@
-# Local development services. Start with:  docker compose up -d db
-# To wipe the database and start fresh:    docker compose down -v
-# Requires a .env file next to this one (copy .env.example and set a password).
+# Dev DB: docker compose up -d db (down -v wipes it); needs a .env copied from .env.example.
 
 services:
   db:
@@ -14,10 +12,8 @@ services:
       # Bound to localhost only, so the database is not reachable from the network.
       - "127.0.0.1:5432:5432"
     volumes:
-      # postgres:18 keeps its data under /var/lib/postgresql/18/, so mount the parent.
+      # postgres:18 keeps data under /var/lib/postgresql/18/, so mount the parent.
       - pgdata:/var/lib/postgresql
-      # No migrations are mounted here: the backend applies backend/migrations itself
-      # at startup (tracked in the schema_migrations table).
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

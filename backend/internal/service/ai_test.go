@@ -205,8 +205,7 @@ func indexOfStatus(statuses []review.Status, want review.Status) int {
 }
 
 func TestBadAIOutputMessageDoesNotLeakIfSkillMissing(t *testing.T) {
-	// Guard against a regression where an ai finding for a skill not in the
-	// review (e.g. a stale check id) would panic instead of being dropped.
+	// A finding for a skill not in the review must be dropped, not panic.
 	store := newFakeStore()
 	provider := &fakeAI{fn: func(ai.ReviewInput) ([]ai.Finding, error) {
 		f := aiFinding("goroutine-leak", "main.go", 0.9)

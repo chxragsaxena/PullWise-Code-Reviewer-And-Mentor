@@ -1,11 +1,4 @@
-// Package tsast implements review.StaticAnalyzer for TypeScript using
-// tree-sitter: Go's own parser can't read TypeScript syntax, so this is the
-// one analyzer in the project that needs cgo and a real grammar, unlike
-// goast (which uses the standard library for Go).
-//
-// Every check here is syntactic, the same limitation goast documents: there
-// is no type checker behind this, so a few checks are necessarily
-// heuristic — see each check's comment for its known limits.
+// Package tsast implements review.StaticAnalyzer for TypeScript using tree-sitter.
 package tsast
 
 import (
@@ -26,8 +19,6 @@ const defaultComplexityThreshold = 15
 
 // Config tunes the analyzer.
 type Config struct {
-	// ComplexityThreshold is the cyclomatic complexity above which a function
-	// is flagged. Non-positive uses the default (15).
 	ComplexityThreshold int
 }
 
@@ -45,8 +36,7 @@ func New(cfg Config) *Analyzer {
 	return &Analyzer{complexityThreshold: threshold}
 }
 
-// Analyze runs every check against each changed TypeScript file. A file is
-// only skipped if it fails to parse — logged, not fatal to the review.
+// Analyze runs every check against each changed TypeScript file.
 func (a *Analyzer) Analyze(ctx context.Context, input review.AnalysisInput) ([]review.Finding, error) {
 	var findings []review.Finding
 	for _, file := range input.Files {
@@ -66,9 +56,6 @@ func (a *Analyzer) Analyze(ctx context.Context, input review.AnalysisInput) ([]r
 	return findings, nil
 }
 
-// grammarFor picks the TSX grammar for .tsx files (which contain JSX) and
-// plain TypeScript otherwise. lang.Detect treats both as one language, so
-// the analyzer decides the actual grammar itself, from the file extension.
 func grammarFor(path string) *sitter.Language {
 	if strings.HasSuffix(path, ".tsx") {
 		return tsx.GetLanguage()
@@ -121,9 +108,6 @@ func (a *Analyzer) analyzeFile(ctx context.Context, file review.ChangedFile) ([]
 	return findings, nil
 }
 
-// walk visits n and every named descendant, depth-first. Unnamed nodes
-// (punctuation, keywords) are reached as fields of their named parent via
-// ChildByFieldName, not visited independently.
 func walk(n *sitter.Node, visit func(*sitter.Node)) {
 	visit(n)
 	for i := 0; i < int(n.NamedChildCount()); i++ {
@@ -139,8 +123,6 @@ type source struct {
 
 func (s *source) line(n *sitter.Node) int { return int(n.StartPoint().Row) + 1 }
 
-// endLine returns 0 ("single line", per review.Finding's convention) when
-// the node starts and ends on the same line.
 func (s *source) endLine(n *sitter.Node) int {
 	start, end := n.StartPoint().Row, n.EndPoint().Row
 	if start == end {

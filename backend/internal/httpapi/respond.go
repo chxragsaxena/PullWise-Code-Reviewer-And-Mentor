@@ -29,14 +29,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// writeError sends the standard error body. code is a stable machine-readable
-// string; message is for humans.
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, errorBody{Error: errorDetail{Code: code, Message: message}})
 }
 
-// decodeJSON reads exactly one JSON value from the request body into v. It
-// enforces a size limit and returns an apiError describing what was wrong.
 func decodeJSON(w http.ResponseWriter, r *http.Request, maxBytes int64, v any) *apiError {
 	if mt := strings.TrimSpace(strings.SplitN(r.Header.Get("Content-Type"), ";", 2)[0]); mt != "application/json" {
 		return &apiError{http.StatusUnsupportedMediaType, "unsupported_media_type", "Send the request as application/json."}
@@ -65,8 +61,6 @@ type apiError struct {
 
 func (e *apiError) write(w http.ResponseWriter) { writeError(w, e.status, e.code, e.message) }
 
-// methods dispatches by HTTP method and answers anything else with a JSON 405,
-// so every response from the API, including routing errors, has the same shape.
 type methods map[string]http.HandlerFunc
 
 func (m methods) ServeHTTP(w http.ResponseWriter, r *http.Request) {

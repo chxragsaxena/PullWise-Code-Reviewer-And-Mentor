@@ -15,10 +15,7 @@ export type Severity = (typeof SEVERITIES)[number];
 
 export type FindingSource = "deterministic" | "ai";
 
-/**
- * The error shape used by every failed request and by Review.error. Named
- * ApiErrorBody here because ApiError is the class thrown by the client.
- */
+/** Error shape of failed requests and Review.error (ApiError is the thrown class). */
 export interface ApiErrorBody {
   code: string;
   message: string;

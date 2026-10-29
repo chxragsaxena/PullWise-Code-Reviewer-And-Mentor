@@ -4,11 +4,7 @@ import { useApi } from "../api/ApiProvider";
 import type { AuthUser } from "../api/types";
 import "./AuthStatus.css";
 
-/**
- * Sign-in state in the header: "Sign in with GitHub" when signed out, or the
- * user's avatar and a sign-out button when signed in. Reviewing private
- * repos needs this; public PRs work either way.
- */
+/** Header sign-in state; private repos need sign-in, public PRs work either way. */
 export function AuthStatus() {
   const api = useApi();
   const [user, setUser] = useState<AuthUser | null>(null);

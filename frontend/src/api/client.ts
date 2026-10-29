@@ -18,10 +18,7 @@ export interface ProgressHandlers {
   onError: (error: Error) => void;
 }
 
-/**
- * Everything the UI needs from the backend. The UI depends only on this
- * interface, so the mock and the real HTTP client are interchangeable.
- */
+/** The UI depends only on this interface, so mock and HTTP clients are interchangeable. */
 export interface ApiClient {
   /** "mock" clients simulate data in the browser; the UI labels them as a demo. */
   readonly kind: "mock" | "http";
@@ -29,15 +26,12 @@ export interface ApiClient {
   listReviews(): Promise<ReviewSummary[]>;
   getReview(id: string): Promise<Review>;
   getFinding(reviewId: string, findingId: string): Promise<FindingDetail>;
-  /**
-   * Streams status changes for a review. The current status is delivered first.
-   * Returns a function that stops the stream.
-   */
+  /** Streams status changes (current status first); returns a function that stops the stream. */
   subscribeToReview(id: string, handlers: ProgressHandlers): () => void;
 
   /** The signed-in user, or null if signed out. Always resolves, never throws. */
   getCurrentUser(): Promise<AuthUser | null>;
-  /** Starts GitHub sign-in. The http client navigates the browser away; the mock client simulates success in place. */
+  /** Starts GitHub sign-in; the http client navigates away, the mock simulates success. */
   login(): Promise<void>;
   logout(): Promise<void>;
 

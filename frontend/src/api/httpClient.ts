@@ -18,8 +18,7 @@ export function createHttpClient(baseUrl = ""): ApiClient {
 
     let response: Response;
     try {
-      // Same-origin in both dev (Vite proxies /auth and /api to the backend)
-      // and prod, so the session cookie needs no cross-origin CORS handling.
+      // Same-origin in dev (Vite proxy) and prod, so the session cookie needs no CORS handling.
       response = await fetch(`${baseUrl}${path}`, { ...init, headers, credentials: "same-origin" });
     } catch {
       throw new ApiError("network_error", "Could not reach the server. Check your connection and try again.", 0);
@@ -61,8 +60,7 @@ export function createHttpClient(baseUrl = ""): ApiClient {
     },
 
     async login() {
-      // A full browser navigation, not a fetch: GitHub needs to see the
-      // actual redirect chain, and the response sets an HttpOnly cookie.
+      // A full navigation, not a fetch: GitHub needs the redirect chain and the cookie is HttpOnly.
       window.location.href = `${baseUrl}/auth/github/login`;
     },
 
@@ -111,13 +109,11 @@ function openEventStream(url: string, { onEvent, onError }: ProgressHandlers): (
       return;
     }
     onEvent(event);
-    // The server closes the stream after a terminal status; close our side too
-    // so the browser does not reconnect.
+    // The server closes after a terminal status; close our side so the browser does not reconnect.
     if (isTerminal(event.status)) source.close();
   });
 
-  // While the browser is reconnecting there is nothing to report. Only a
-  // permanently closed stream is an error.
+  // A browser reconnect is not an error; only a permanently closed stream is.
   source.onerror = () => {
     if (source.readyState === EventSource.CLOSED) onError(new Error("Lost connection to the review stream."));
   };

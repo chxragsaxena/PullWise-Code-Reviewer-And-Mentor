@@ -3,8 +3,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-# cgo is required: the TypeScript analyzer uses tree-sitter (C). This image
-# ships gcc, and the runtime image below has the matching glibc.
+# cgo is required (tree-sitter); the runtime image below has the matching glibc.
 RUN CGO_ENABLED=1 go build -trimpath -o /out/server ./cmd/server
 
 FROM debian:bookworm-slim
@@ -15,8 +14,7 @@ RUN apt-get update \
  && useradd --system --no-create-home pullwise
 WORKDIR /app
 COPY --from=build /out/server /app/server
-# Skills are files read at startup (SKILLS_DIR defaults to ./skills). Migrations
-# are embedded in the binary.
+# Skills are read from files at startup (SKILLS_DIR); migrations are embedded in the binary.
 COPY skills /app/skills
 USER pullwise
 EXPOSE 8080

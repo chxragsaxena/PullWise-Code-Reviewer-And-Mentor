@@ -28,8 +28,6 @@ func newClient(t *testing.T, h http.HandlerFunc) *Client {
 	return c
 }
 
-// decodeToken checks a bearer token's signature independently of the client's
-// own code and returns its claims.
 func decodeToken(t *testing.T, header string) map[string]any {
 	t.Helper()
 	raw, ok := strings.CutPrefix(header, "Bearer ")

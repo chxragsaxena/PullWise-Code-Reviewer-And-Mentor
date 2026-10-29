@@ -8,8 +8,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 )
 
-// The creating user's GitHub token must reach every GitHub call the background
-// worker makes, even though the worker runs long after the request returned.
+// The creating user's GitHub token must reach every GitHub call the background worker makes.
 func TestCreatorsGitHubTokenReachesTheBackgroundGitHubCalls(t *testing.T) {
 	tests := []struct {
 		name      string

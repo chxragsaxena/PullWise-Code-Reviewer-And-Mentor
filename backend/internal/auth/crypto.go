@@ -1,5 +1,4 @@
-// Package auth implements GitHub OAuth login: the authorize/callback flow,
-// encrypting the resulting tokens at rest, and server-side sessions.
+// Package auth implements GitHub OAuth login, token encryption at rest, and sessions.
 package auth
 
 import (
@@ -15,9 +14,7 @@ import (
 // keySize is AES-256's key length.
 const keySize = 32
 
-// DecodeKey decodes the base64 value of SESSION_SECRET into a 32-byte AES
-// key. Generate one with 32 random bytes, base64-encoded — this project
-// generated it via crypto/rand when setting up .env.
+// DecodeKey decodes the base64 value of SESSION_SECRET into a 32-byte AES key.
 func DecodeKey(base64Value string) ([]byte, error) {
 	key, err := base64.StdEncoding.DecodeString(base64Value)
 	if err != nil {
@@ -29,8 +26,6 @@ func DecodeKey(base64Value string) ([]byte, error) {
 	return key, nil
 }
 
-// Encryptor encrypts and decrypts small secrets (OAuth tokens) at rest with
-// AES-256-GCM, so a database leak alone does not expose usable credentials.
 type Encryptor struct {
 	gcm cipher.AEAD
 }
@@ -51,8 +46,6 @@ func NewEncryptor(key []byte) (*Encryptor, error) {
 	return &Encryptor{gcm: gcm}, nil
 }
 
-// Encrypt returns a self-contained ciphertext (nonce prepended) suitable for
-// storing directly in a BYTEA column.
 func (e *Encryptor) Encrypt(plaintext string) ([]byte, error) {
 	nonce := make([]byte, e.gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -61,8 +54,7 @@ func (e *Encryptor) Encrypt(plaintext string) ([]byte, error) {
 	return e.gcm.Seal(nonce, nonce, []byte(plaintext), nil), nil
 }
 
-// Decrypt reverses Encrypt. A tampered or truncated ciphertext is an error,
-// not a zero-value result — callers must not treat it as "no token".
+// Decrypt reverses Encrypt.
 func (e *Encryptor) Decrypt(data []byte) (string, error) {
 	ns := e.gcm.NonceSize()
 	if len(data) < ns {

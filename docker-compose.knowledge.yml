@@ -1,13 +1,6 @@
-# Adds the knowledge service, which lives in its own repository
-# (github.com/chxragsaxena/pullwise-knowledge), next to PullWise. Clone it beside
-# this repo (so it sits at ../pullwise-knowledge), then:
-#
-#   docker compose -f docker-compose.prod.yml -f docker-compose.knowledge.yml up -d --build
-#
-# Needs in .env: KNOWLEDGE_JWT_SECRET (>= 32 bytes; openssl rand -base64 32),
-# KNOWLEDGE_DB_PASSWORD, and COHERE_API_KEY. The knowledge service and its database
-# are not published to the host: only the backend can reach them, over the compose
-# network. For mutual TLS between the two, see the knowledge repo's README.
+# Add with: -f docker-compose.prod.yml -f docker-compose.knowledge.yml up -d --build
+
+# Needs github.com/chxragsaxena/pullwise-knowledge cloned at ../pullwise-knowledge; secrets in .env.example.
 
 services:
   backend:

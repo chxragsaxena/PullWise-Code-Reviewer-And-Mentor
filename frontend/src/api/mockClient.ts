@@ -58,10 +58,7 @@ function toSummary(review: Review): ReviewSummary {
   };
 }
 
-/**
- * An in-browser stand-in for the Go backend that follows docs/api.md,
- * including a simulated progress stream.
- */
+/** In-browser stand-in for the Go backend (docs/api.md), with a simulated progress stream. */
 export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockClientOptions = {}): ApiClient {
   const store = new Map<string, StoredReview>();
   let nextId = 1;

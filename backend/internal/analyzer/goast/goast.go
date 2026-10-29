@@ -1,11 +1,4 @@
-// Package goast implements review.StaticAnalyzer for Go source using the
-// standard library's go/parser and go/ast: no external dependency, and exact
-// syntax for the language it targets.
-//
-// Every check here is syntactic. Without a full module's type information
-// (go/types, which needs the whole dependency graph, not just one file), a
-// couple of checks are necessarily heuristic — see the comment on each one
-// for its known limits.
+// Package goast implements review.StaticAnalyzer for Go source using go/parser and go/ast.
 package goast
 
 import (
@@ -25,8 +18,6 @@ const defaultComplexityThreshold = 15
 
 // Config tunes the analyzer.
 type Config struct {
-	// ComplexityThreshold is the cyclomatic complexity above which a function
-	// is flagged. Non-positive uses the default (15).
 	ComplexityThreshold int
 }
 
@@ -44,9 +35,7 @@ func New(cfg Config) *Analyzer {
 	return &Analyzer{complexityThreshold: threshold}
 }
 
-// Analyze runs every check against each changed Go file. A file is only
-// skipped if it fails to parse (for example, a work-in-progress syntax
-// error) — that is logged and does not fail the review.
+// Analyze runs every check against each changed Go file.
 func (a *Analyzer) Analyze(ctx context.Context, input review.AnalysisInput) ([]review.Finding, error) {
 	var findings []review.Finding
 	for _, file := range input.Files {
@@ -69,8 +58,6 @@ func (a *Analyzer) analyzeFile(file review.ChangedFile) []review.Finding {
 		return nil
 	}
 
-	// Resolved once per file: a check only needs to run if the package it
-	// looks for was actually imported (under whatever local name).
 	ctxPkg, hasCtxPkg := importedName(astFile, "context")
 	httpPkg, hasHTTPPkg := importedName(astFile, "net/http")
 	src := &source{fset: fset, content: file.Content, path: file.Path}
@@ -112,8 +99,6 @@ type source struct {
 
 func (s *source) line(pos token.Pos) int { return s.fset.Position(pos).Line }
 
-// endLine returns 0 ("single line", per review.Finding's convention) when
-// start and end fall on the same line.
 func (s *source) endLine(start, end token.Pos) int {
 	if a, b := s.line(start), s.line(end); a != b {
 		return b
@@ -121,8 +106,6 @@ func (s *source) endLine(start, end token.Pos) int {
 	return 0
 }
 
-// snippet returns the source text between start and end, trimmed and capped
-// so one large statement cannot dominate a finding.
 func (s *source) snippet(start, end token.Pos) string {
 	a, b := s.fset.Position(start).Offset, s.fset.Position(end).Offset
 	if a < 0 || b > len(s.content) || a >= b {

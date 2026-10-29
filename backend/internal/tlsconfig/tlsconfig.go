@@ -9,9 +9,6 @@ import (
 	"os"
 )
 
-// Client returns a TLS configuration for calling a service: it trusts only the
-// CA in caFile (or the system's CAs if caFile is empty) and, if certFile is set,
-// presents that certificate so the service can verify who is calling (mutual TLS).
 func Client(certFile, keyFile, caFile string) (*tls.Config, error) {
 	cfg := &tls.Config{MinVersion: tls.VersionTLS13}
 

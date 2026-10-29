@@ -195,8 +195,6 @@ func TestCallbackRejectsStateMismatch(t *testing.T) {
 }
 
 func TestCallbackRejectsEmptyExpectedState(t *testing.T) {
-	// Guards against a missing/expired state cookie being silently treated
-	// as "no check needed".
 	svc, _ := newTestService(t, nil, nil)
 	_, _, err := svc.Callback(context.Background(), "code", "", "")
 	if !errors.Is(err, ErrStateMismatch) {
@@ -298,8 +296,6 @@ func TestUserGitHubTokenRefusesAnExpiredToken(t *testing.T) {
 	}
 }
 
-// refreshServer answers GitHub's token endpoint for refresh_token grants and
-// counts how many times it was asked.
 func refreshingService(t *testing.T, respond func(refreshToken string) (int, string)) (*Service, *fakeStore, *int32) {
 	t.Helper()
 	var calls int32

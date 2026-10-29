@@ -12,16 +12,14 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// Knowledge is the repository knowledge base (the separate pullwise-knowledge
-// service): it indexes a repository and finds the code related to a query.
+// Knowledge is the repository knowledge base: it indexes a repository and finds related code.
 type Knowledge interface {
 	IndexedRef(ctx context.Context, tenant, repo string) (string, bool, error)
 	Index(ctx context.Context, tenant, repo, ref string, files []knowledge.File) (knowledge.IndexResult, error)
 	Search(ctx context.Context, tenant, repo, query string, topK int, excludePaths []string) ([]knowledge.Snippet, error)
 }
 
-// RepositorySource is an optional capability of a PullRequestSource: reading a
-// whole repository at a commit. The GitHub client has it; test fakes need not.
+// RepositorySource is an optional PullRequestSource capability: read a repository at a commit.
 type RepositorySource interface {
 	RepositoryFiles(ctx context.Context, ref github.PullRequestRef, sha string) ([]github.SourceFile, error)
 }
@@ -33,13 +31,7 @@ const (
 	maxSnippets      = 6
 )
 
-// relatedCode finds code elsewhere in the repository that relates to what the
-// pull request changes, to give the AI pass context beyond the diff. It indexes
-// the repository's base commit (shared by every PR against it, so often already
-// done) and searches it with the changed code, excluding the changed files.
-//
-// It never fails the review: if the knowledge base is not configured or any step
-// goes wrong, the review simply proceeds without extra context.
+// relatedCode finds code elsewhere in the repository related to the PR; it never fails the review.
 func (s *Service) relatedCode(ctx context.Context, reviewID string, ref github.PullRequestRef, pr github.PullRequest, changed []review.ChangedFile) []ai.ContextSnippet {
 	repoSource, ok := s.source.(RepositorySource)
 	if s.knowledge == nil || s.aiProvider == nil || !ok {
@@ -63,8 +55,7 @@ func (s *Service) relatedCode(ctx context.Context, reviewID string, ref github.P
 }
 
 func (s *Service) findRelated(ctx context.Context, repoSource RepositorySource, tenant, repo string, ref github.PullRequestRef, sha string, changed []review.ChangedFile) ([]ai.ContextSnippet, error) {
-	// Index only if this commit isn't already indexed for this tenant: skipping
-	// avoids the archive download and the embedding calls.
+	// Index only if this commit isn't indexed yet, to skip the archive download and embeddings.
 	if have, ok, err := s.knowledge.IndexedRef(ctx, tenant, repo); err != nil {
 		return nil, err
 	} else if !ok || have != sha {
@@ -133,8 +124,7 @@ func pickSnippets(found []knowledge.Snippet) []ai.ContextSnippet {
 	return out
 }
 
-// tenantFor names whose data a review's knowledge calls may touch: a signed-in
-// user's own index, or the shared one for anonymous reviews of public repos.
+// tenantFor names whose index a review's knowledge calls use: the user's own, or the shared one.
 func tenantFor(viewerID string) string {
 	if viewerID == "" {
 		return "public"

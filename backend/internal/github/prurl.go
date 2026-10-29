@@ -24,9 +24,6 @@ func (r PullRequestRef) String() string {
 	return fmt.Sprintf("%s/%s#%d", r.Owner, r.Repo, r.Number)
 }
 
-// ParsePRURL extracts owner, repo and number from a link such as
-// https://github.com/owner/repo/pull/123. The scheme is optional, and trailing
-// segments such as /files, query strings and fragments are ignored.
 func ParsePRURL(raw string) (PullRequestRef, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

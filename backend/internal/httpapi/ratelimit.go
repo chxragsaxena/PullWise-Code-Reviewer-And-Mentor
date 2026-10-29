@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// limiter is a per-key token bucket: each key may burst up to `burst` requests,
-// then is limited to `rate` requests per second. It is safe for concurrent use.
 type limiter struct {
 	rate  float64
 	burst float64
@@ -31,8 +29,6 @@ func newLimiter(perMinute, burst int, now func() time.Time) *limiter {
 	}
 }
 
-// allow reports whether the key may make a request now. When it may not, it
-// also returns how long to wait before a request would succeed.
 func (l *limiter) allow(key string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -56,8 +52,6 @@ func (l *limiter) allow(key string) (bool, time.Duration) {
 	return false, wait
 }
 
-// sweep forgets keys that have been idle long enough to have a full bucket
-// again, so the map cannot grow without bound. The caller holds l.mu.
 func (l *limiter) sweep(now time.Time) {
 	if now.Sub(l.lastSweep) < time.Minute {
 		return

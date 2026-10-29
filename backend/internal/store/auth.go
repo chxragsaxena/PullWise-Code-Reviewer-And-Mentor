@@ -14,9 +14,7 @@ import (
 // ErrSessionNotFound means no active, unexpired session matches the token.
 var ErrSessionNotFound = errors.New("session not found")
 
-// UpsertGitHubUser creates or updates the user row for a GitHub account,
-// keyed by their stable github_id. Profile fields refresh on every login,
-// since a user's name or avatar can change on GitHub between logins.
+// UpsertGitHubUser creates or updates the user row for a GitHub account by github_id.
 func (s *Store) UpsertGitHubUser(ctx context.Context, p auth.Profile) (auth.User, error) {
 	var id int64
 	err := s.db.QueryRowContext(ctx, `
@@ -35,8 +33,7 @@ func (s *Store) UpsertGitHubUser(ctx context.Context, p auth.Profile) (auth.User
 
 func nullable(s string) sql.NullString { return sql.NullString{String: s, Valid: s != ""} }
 
-// SaveTokens stores a user's encrypted GitHub OAuth tokens. refreshEnc and
-// expiresAt are nil for a token that does not expire.
+// SaveTokens stores a user's encrypted GitHub OAuth tokens; refreshEnc and expiresAt may be nil.
 func (s *Store) SaveTokens(ctx context.Context, userID string, accessEnc, refreshEnc []byte, expiresAt *time.Time) error {
 	id, ok := parseID(userID)
 	if !ok {
@@ -84,8 +81,7 @@ func (s *Store) CreateSession(ctx context.Context, hash auth.SessionTokenHash, u
 	return nil
 }
 
-// GetSessionUser returns the user for a session token's hash, if it exists
-// and has not expired.
+// GetSessionUser returns the user for a session token's hash if it exists and is unexpired.
 func (s *Store) GetSessionUser(ctx context.Context, hash auth.SessionTokenHash) (auth.User, error) {
 	var u auth.User
 	var id int64
@@ -105,8 +101,7 @@ func (s *Store) GetSessionUser(ctx context.Context, hash auth.SessionTokenHash) 
 	return u, nil
 }
 
-// DeleteSession removes one session (logout). Deleting an unknown or
-// already-expired session is not an error.
+// DeleteSession removes one session (logout); an unknown or expired one is not an error.
 func (s *Store) DeleteSession(ctx context.Context, hash auth.SessionTokenHash) error {
 	if _, err := s.db.ExecContext(ctx, "DELETE FROM sessions WHERE token_hash = $1", hash[:]); err != nil {
 		return fmt.Errorf("delete session: %w", err)
@@ -114,9 +109,7 @@ func (s *Store) DeleteSession(ctx context.Context, hash auth.SessionTokenHash) e
 	return nil
 }
 
-// DeleteExpiredSessions removes every session past its expiry. Call this
-// periodically (e.g. at startup, alongside FailInterrupted) to keep the
-// table from growing without bound.
+// DeleteExpiredSessions removes every session past its expiry.
 func (s *Store) DeleteExpiredSessions(ctx context.Context) (int, error) {
 	res, err := s.db.ExecContext(ctx, "DELETE FROM sessions WHERE expires_at <= now()")
 	if err != nil {

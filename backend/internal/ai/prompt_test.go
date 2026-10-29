@@ -63,7 +63,7 @@ func TestBuildPromptSkipsFilesWithNoPatch(t *testing.T) {
 
 func TestWriteFilesRespectsTheBudget(t *testing.T) {
 	var b strings.Builder
-	big := strings.Repeat("x", maxPromptChars-40) // fits alone, with too little budget left for another entry's wrapper
+	big := strings.Repeat("x", maxPromptChars-40)
 	files := []review.ChangedFile{
 		{Path: "a.go", Patch: big},
 		{Path: "b.go", Patch: "small"},

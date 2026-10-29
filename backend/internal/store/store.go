@@ -40,8 +40,7 @@ func Open(ctx context.Context, databaseURL string) (*sql.DB, error) {
 	return db, nil
 }
 
-// SyncSkills makes the skills table mirror the loaded skill definitions, so
-// findings can reference them by foreign key.
+// SyncSkills makes the skills table mirror the loaded skills, for foreign keys.
 func (s *Store) SyncSkills(ctx context.Context, loaded []skills.Skill) error {
 	for _, sk := range loaded {
 		_, err := s.db.ExecContext(ctx, `
@@ -57,8 +56,7 @@ func (s *Store) SyncSkills(ctx context.Context, loaded []skills.Skill) error {
 	return nil
 }
 
-// parseID turns an API id into a database id. Anything that is not a positive
-// integer cannot exist, so callers treat a failure as "not found".
+// parseID turns an API id into a database id; a failure means "not found".
 func parseID(id string) (int64, bool) {
 	n, err := strconv.ParseInt(id, 10, 64)
 	return n, err == nil && n > 0

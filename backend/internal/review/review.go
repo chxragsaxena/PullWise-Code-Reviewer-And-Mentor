@@ -13,8 +13,7 @@ var (
 	ErrReviewNotFound = errors.New("review not found")
 	// ErrFindingNotFound means the review has no finding with the requested id.
 	ErrFindingNotFound = errors.New("finding not found")
-	// ErrReviewFinished means an update was refused because the review already
-	// reached a terminal status.
+	// ErrReviewFinished means an update was refused because the review is already terminal.
 	ErrReviewFinished = errors.New("review already finished")
 )
 
@@ -82,8 +81,7 @@ type Finding struct {
 	Severity   Severity
 	Confidence float64
 	File       string
-	// Line is 1-based. 0 means the finding applies to the whole file
-	// (null in the API and database).
+	// Line is 1-based; 0 means the whole file (null in the API and database).
 	Line int
 	// EndLine is 0 when the finding is a single line or the whole file.
 	EndLine     int
@@ -143,8 +141,7 @@ func CountFindings(findings []Finding) Counts {
 	return c
 }
 
-// PullRequest describes a pull request. Only Owner, Repo and Number are known
-// when a review is created; the rest is filled in once GitHub has been queried.
+// PullRequest describes a pull request; only Owner, Repo and Number are known at creation.
 type PullRequest struct {
 	Owner        string
 	Repo         string
@@ -191,8 +188,7 @@ type ChangedFile struct {
 	Path     string
 	Language string
 	Patch    string
-	// Content is the file's full text at the PR's head commit. It is empty for
-	// deleted files and for files that were not downloaded.
+	// Content is the file's text at the PR's head commit; empty for deleted or undownloaded files.
 	Content string
 }
 
@@ -201,9 +197,7 @@ type AnalysisInput struct {
 	Files []ChangedFile
 }
 
-// StaticAnalyzer produces deterministic findings. Analyzers report only what
-// they observed (skill, check, location, evidence and explanation); severity,
-// source, confidence and titles come from the skill definition.
+// StaticAnalyzer produces deterministic findings; severity and titles come from the skill.
 type StaticAnalyzer interface {
 	Analyze(ctx context.Context, input AnalysisInput) ([]Finding, error)
 }

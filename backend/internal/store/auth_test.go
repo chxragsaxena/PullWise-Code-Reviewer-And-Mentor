@@ -25,8 +25,7 @@ func TestUpsertGitHubUserCreatesThenUpdates(t *testing.T) {
 		t.Fatalf("created = %+v", created)
 	}
 
-	// Same github_id, changed profile fields (e.g. renamed on GitHub): same
-	// row, updated fields.
+	// Same github_id with changed profile fields: same row, updated fields.
 	updated := testProfile(555, "chirag-renamed")
 	updated.Name = "New Name"
 	again, err := s.UpsertGitHubUser(ctx, updated)

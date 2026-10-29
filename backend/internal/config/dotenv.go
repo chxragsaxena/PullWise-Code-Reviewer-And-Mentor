@@ -9,12 +9,6 @@ import (
 	"strings"
 )
 
-// LoadDotEnv reads KEY=VALUE files and sets each variable that is not already
-// set in the environment, so real environment variables always win. Files that
-// do not exist are skipped, and it returns the paths that were loaded.
-//
-// Lines starting with # are comments, an optional "export " prefix is ignored,
-// and values may be wrapped in single or double quotes.
 func LoadDotEnv(paths ...string) ([]string, error) {
 	var loaded []string
 	for _, path := range paths {

@@ -1,5 +1,4 @@
-// Package skills loads review skills from disk. A skill is a skill.yaml that
-// says what to check, plus lessons/*.md that say what to teach.
+// Package skills loads review skills (skill.yaml plus lessons/*.md) from disk.
 package skills
 
 import (
@@ -33,11 +32,9 @@ const (
 	AnalyzerSemgrep    Analyzer = "semgrep"
 	AnalyzerTreeSitter Analyzer = "treesitter"
 	AnalyzerMetric     Analyzer = "metric"
-	// AnalyzerGoAST is internal/analyzer/goast: Go's own go/parser + go/ast,
-	// used instead of Tree-sitter for Go specifically (see docs/TRACKER.md).
+	// AnalyzerGoAST is internal/analyzer/goast, using go/parser and go/ast instead of Tree-sitter.
 	AnalyzerGoAST Analyzer = "goast"
-	// AnalyzerTSAST is internal/analyzer/tsast: tree-sitter, used for
-	// TypeScript (Go's own parser can't read it).
+	// AnalyzerTSAST is internal/analyzer/tsast, tree-sitter based, for TypeScript.
 	AnalyzerTSAST Analyzer = "tsast"
 )
 
@@ -96,10 +93,7 @@ func (s Skill) Check(id string) (Check, bool) {
 	return Check{}, false
 }
 
-// AnyLanguage, listed in a skill's languages, makes the skill apply to every
-// source language the service recognises (see package lang). Use it for
-// judgment-based AI skills (design principles) that aren't tied to one
-// language's syntax.
+// AnyLanguage, listed in a skill's languages, makes the skill apply to every language.
 const AnyLanguage = "*"
 
 // AppliesTo reports whether the skill covers the given language.
@@ -112,9 +106,7 @@ func (s Skill) AppliesTo(language string) bool {
 	return false
 }
 
-// Load reads every <dir>/*/skill.yaml from fsys, validates each skill and
-// returns them sorted by ID. Any invalid skill fails the whole load, so
-// mistakes surface at startup rather than mid-review.
+// Load reads every <dir>/*/skill.yaml from fsys, validates it and returns skills sorted by ID.
 func Load(fsys fs.FS) ([]Skill, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {

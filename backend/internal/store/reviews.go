@@ -10,9 +10,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// reviewColumns joins a review with its pull request and repository. The head
-// commit comes from the review itself, because a pull request row is shared by
-// every review of that PR and is overwritten as the PR moves on.
+// reviewColumns joins a review with its PR and repository; the head commit comes from the review.
 const reviewSelect = `
 	SELECT r.id, r.status, r.status_message, r.status_at, r.error_code, r.error_message,
 	       r.created_at, r.completed_at, r.head_sha,
@@ -25,12 +23,10 @@ const reviewSelect = `
 const findingColumns = `id, skill_id, check_id, source, severity, confidence, file,
 	line, end_line, evidence, found, why, improvement, lesson_id`
 
-// visibleTo is the condition (with one placeholder for the viewer's id) that
-// limits reviews to anonymous ones and the viewer's own; see migration 0003.
+// visibleTo limits reviews to anonymous ones and the viewer's own; see migration 0003.
 const visibleTo = "(r.owner_id IS NULL OR r.owner_id = %s)"
 
-// viewerArg is the viewer's user id for a query, or NULL when anonymous. A NULL
-// never equals owner_id, so an anonymous caller sees only unowned reviews.
+// viewerArg is the viewer's user id, or NULL when anonymous (sees only unowned reviews).
 func viewerArg(ctx context.Context) sql.NullInt64 {
 	n, ok := parseID(review.ViewerFrom(ctx))
 	return sql.NullInt64{Int64: n, Valid: ok}
@@ -91,8 +87,7 @@ func scanFinding(row rowScanner) (review.Finding, error) {
 	return f, nil
 }
 
-// CreateReview records a new queued review for a pull request, creating the
-// repository and pull request rows on first sight.
+// CreateReview records a new queued review, creating the repository and PR rows on first sight.
 func (s *Store) CreateReview(ctx context.Context, owner, repo string, number int) (review.Review, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -174,8 +169,7 @@ func (s *Store) GetReview(ctx context.Context, id string) (review.Review, error)
 	return rv, nil
 }
 
-// ListReviews returns the most recent reviews, newest first, without their
-// findings but with per-severity counts.
+// ListReviews returns the most recent reviews, newest first, with severity counts but no findings.
 func (s *Store) ListReviews(ctx context.Context, limit int) ([]review.Review, error) {
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT r.id, r.status, r.status_message, r.status_at, r.error_code, r.error_message,
@@ -217,8 +211,7 @@ func (s *Store) ListReviews(ctx context.Context, limit int) ([]review.Review, er
 	return out, nil
 }
 
-// withCounts lets scanReview read the 19 review columns while capturing the 4
-// trailing count columns of the list query.
+// withCounts lets scanReview read the 19 review columns plus the 4 trailing count columns.
 type withCounts struct {
 	rows   *sql.Rows
 	counts *review.Counts
@@ -302,8 +295,7 @@ func (s *Store) SavePullRequest(ctx context.Context, id string, pr review.PullRe
 	return nil
 }
 
-// CompleteReview saves the findings and marks the review completed in one
-// transaction, so a reader never sees a completed review with missing findings.
+// CompleteReview saves the findings and marks the review completed in one transaction.
 func (s *Store) CompleteReview(ctx context.Context, id string, findings []review.Finding, message string) error {
 	n, ok := parseID(id)
 	if !ok {
@@ -362,8 +354,7 @@ func (s *Store) FailReview(ctx context.Context, id, code, message string) error 
 	return s.requireChange(ctx, res, n)
 }
 
-// FailInterrupted marks every review still in progress as failed. Call it at
-// startup: a review that was running when the previous process died will never finish.
+// FailInterrupted marks every in-progress review failed; call it at startup.
 func (s *Store) FailInterrupted(ctx context.Context) (int, error) {
 	const message = "The server restarted while this review was running. Please start it again."
 	res, err := s.db.ExecContext(ctx, `
@@ -381,8 +372,7 @@ func (s *Store) FailInterrupted(ctx context.Context) (int, error) {
 	return int(n), nil
 }
 
-// requireChange turns "no row updated" into the right error: either the review
-// does not exist or it had already finished.
+// requireChange turns "no row updated" into the right error: not found or already finished.
 func (s *Store) requireChange(ctx context.Context, res sql.Result, id int64) error {
 	changed, err := res.RowsAffected()
 	if err != nil {

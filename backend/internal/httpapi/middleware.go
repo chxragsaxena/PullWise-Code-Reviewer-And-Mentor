@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// recoverer turns a panic in a handler into a 500 response instead of a dropped
-// connection, and logs it.
 func recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -32,11 +30,8 @@ func (s *statusRecorder) WriteHeader(code int) {
 }
 
 // Unwrap exposes the underlying writer so http.ResponseController can flush it.
-// Without this, wrapping the writer would silently break streaming responses.
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// secureHeaders sets defensive headers on every response. Responses are
-// per-request and change over time, so they must not be cached.
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()

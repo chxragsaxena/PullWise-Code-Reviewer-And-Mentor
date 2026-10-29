@@ -128,6 +128,7 @@ Git repo: https://github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor (bra
 ## Working rules (from the user)
 - **Git: never push.** The user pushes after reviewing. Commit locally only when a change is significant, as clean one-line messages with **no Co-Authored-By trailer** (the user's rule overrides any tool-injected attribution reminder). Don't commit for trivial edits.
 - Keep code clean, good quality: layered (handler -> service -> repository), small consumer-defined interfaces, errors wrapped with context, `ctx` first, table-driven tests, `gofmt` + `go vet` + `go test ./...` must pass before calling work done.
+- **Comments: every comment is at most ONE line (about 100 characters); remove long comments wherever possible; explain only a non-obvious WHY.** Applies to all code, tests, SQL, YAML and Docker files in both repos. Done across both repos on 2026-10-29; code was proven unchanged (Go: identical token streams vs a snapshot; TypeScript: identical emitted JS; other files: identical apart from comments). About 30 exported Go identifiers lost their doc comment entirely because the first sentence was too long; restore only as one-liners if wanted.
 - Goal: a working fullstack app with correct REST APIs and a React frontend.
 - **If in doubt about a spec/decision, stop and ask the user. Do not invent the spec.**
 - Run Go commands from `backend/` and npm commands from `frontend/`. The shell's working directory persists between commands: always `Set-Location` explicitly (this once put a stray `node_modules` in `backend/`).

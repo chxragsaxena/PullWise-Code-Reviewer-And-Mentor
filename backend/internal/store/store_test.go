@@ -14,9 +14,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/migrations"
 )
 
-// testStore returns a Store backed by a freshly migrated database. It needs a
-// throwaway PostgreSQL database named *_test in TEST_DATABASE_URL, and skips
-// otherwise. The schema is wiped, so it refuses to touch any other database.
+// testStore returns a Store on a freshly migrated *_test database from TEST_DATABASE_URL, or skips.
 func testStore(t *testing.T) *Store {
 	t.Helper()
 	raw := os.Getenv("TEST_DATABASE_URL")

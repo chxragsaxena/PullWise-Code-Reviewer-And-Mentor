@@ -6,11 +6,7 @@ export interface PrRef {
 
 const GITHUB_HOSTS = new Set(["github.com", "www.github.com"]);
 
-/**
- * Parses a GitHub pull request link. Mirrors the backend's rules
- * (backend/internal/github/prurl.go) so the form can reject bad input instantly.
- * The scheme is optional; trailing segments, queries and fragments are ignored.
- */
+/** Parses a GitHub PR link, mirroring backend/internal/github/prurl.go; scheme is optional. */
 export function parsePrUrl(raw: string): PrRef | null {
   let value = raw.trim();
   if (!value) return null;

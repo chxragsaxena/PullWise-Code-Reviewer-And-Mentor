@@ -9,11 +9,6 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// streamEvents serves GET /api/reviews/{id}/events as Server-Sent Events.
-//
-// It sends the current status straight away, then one event per change, and
-// ends after a terminal status. If the stream drops, the browser reconnects and
-// is simply told the current status again, so nothing needs to be replayed.
 func (a *API) streamEvents(w http.ResponseWriter, r *http.Request) {
 	ctx, _ := a.viewerContext(r)
 	stream, err := a.svc.Watch(ctx, r.PathValue("id"))

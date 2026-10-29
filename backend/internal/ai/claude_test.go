@@ -12,9 +12,6 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// fakeAnthropicServer records the last request body and replies with a
-// canned Messages API response, so ClaudeProvider is tested against the real
-// wire shape without a network call or an API key.
 func fakeAnthropicServer(t *testing.T, respond func(body map[string]any) (int, string)) (*httptest.Server, *ClaudeProvider) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

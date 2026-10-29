@@ -1,6 +1,4 @@
--- Core schema for the PR reviewer.
--- Relationships: user -> repository -> pull_request -> review -> finding -> skill.
--- Text + CHECK is used instead of enums so values can change with a plain migration.
+-- Core schema; text + CHECK instead of enums so values change with a plain migration.
 
 CREATE TABLE users (
     id         BIGSERIAL PRIMARY KEY,
@@ -10,9 +8,7 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- user_id is nullable: V1 reviews public PRs by URL with no login.
--- github_repo_id is nullable: a review starts before GitHub has been queried.
--- GitHub names are case-insensitive, so uniqueness ignores case.
+-- user_id/github_repo_id are nullable; GitHub names are case-insensitive, so uniqueness ignores case.
 CREATE TABLE repositories (
     id             BIGSERIAL PRIMARY KEY,
     user_id        BIGINT REFERENCES users(id) ON DELETE SET NULL,
@@ -41,8 +37,7 @@ CREATE TABLE pull_requests (
     UNIQUE (repository_id, number)
 );
 
--- Mirror of the skills/ directory, synced at startup. The YAML files stay the
--- source of truth; this table exists so findings can reference a skill by FK.
+-- Mirror of skills/ (the YAML is the source of truth), synced at startup so findings can FK a skill.
 CREATE TABLE skills (
     id        TEXT PRIMARY KEY,          -- slug, e.g. 'go'
     name      TEXT NOT NULL,
@@ -50,9 +45,7 @@ CREATE TABLE skills (
     languages TEXT[] NOT NULL
 );
 
--- One review = one analysis run of a PR at a specific head commit.
--- status_message/status_at hold the latest progress line so a client that
--- connects mid-review can be told where things stand.
+-- One review = one analysis run at a head commit; status_* hold the latest progress line.
 CREATE TABLE reviews (
     id              BIGSERIAL PRIMARY KEY,
     pull_request_id BIGINT NOT NULL REFERENCES pull_requests(id) ON DELETE CASCADE,

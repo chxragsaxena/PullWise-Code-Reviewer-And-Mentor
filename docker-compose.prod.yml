@@ -1,19 +1,6 @@
-# Whole app in containers: database + Go backend + web UI (nginx).
-#
-#   docker compose -f docker-compose.prod.yml up -d --build
-#
-# Then open http://localhost:8080 (or WEB_PORT). Reads .env next to this file
-# (copy .env.example): POSTGRES_PASSWORD is required; GROQ_API_KEY, GITHUB_TOKEN
-# and the GITHUB_OAUTH_* / SESSION_SECRET settings are optional. To add the
-# knowledge service (its own repo), also pass -f docker-compose.knowledge.yml.
-#
-# Deploying behind a real domain: set PUBLIC_URL (e.g. https://pullwise.example.com)
-# and SECURE_COOKIES=true, and use that same URL + /auth/github/callback as the
-# GitHub OAuth App's callback URL. Put HTTPS (a reverse proxy or your host's TLS)
-# in front of the "web" service.
+# Run: docker compose -f docker-compose.prod.yml up -d --build  (needs .env; POSTGRES_PASSWORD required)
 
-# Own project name, so this stack (containers, network, "pgdata" volume) never
-# collides with the development compose file's database.
+# Own project name so this stack never collides with the dev compose file's database.
 name: pullwise
 
 services:
@@ -37,8 +24,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # These override .env: inside the network the database is "db", not localhost.
-      # (A password with special characters must be URL-encoded here.)
+      # Overrides .env: here the database host is "db" (URL-encode special characters in the password).
       DATABASE_URL: postgres://${POSTGRES_USER:-pullwise}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pullwise}?sslmode=disable
       ADDR: ":8080"
       FRONTEND_URL: ${PUBLIC_URL:-http://localhost:8080}

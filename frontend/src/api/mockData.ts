@@ -1,5 +1,4 @@
-// Sample content for the mock API. Some findings use skills (Security, SOLID)
-// that the backend does not have yet; they exist to exercise the UI.
+// Sample mock content; some findings use skills the backend lacks yet, to exercise the UI.
 
 import type { Finding, Lesson, PullRequest } from "./types";
 

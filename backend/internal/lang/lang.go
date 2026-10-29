@@ -9,10 +9,7 @@ const (
 	TypeScript = "typescript"
 )
 
-// byExtension covers source code only: data and markup (JSON, YAML, Markdown,
-// HTML, CSS, SQL) are not reviewed. Go and TypeScript also have deterministic
-// analyzers; every other language is reviewed only by skills that apply to any
-// language (see skills.AnyLanguage), i.e. the AI checks.
+// byExtension covers source code only; data and markup are not reviewed.
 var byExtension = map[string]string{
 	".go":  Go,
 	".ts":  TypeScript,

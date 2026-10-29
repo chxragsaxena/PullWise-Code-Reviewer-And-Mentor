@@ -1,5 +1,4 @@
-# A skill is a packaged review capability: what to check (this file) and what to
-# teach (lessons/*.md). The engine loads every skills/*/skill.yaml at startup.
+# A skill packages what to check (this file) and what to teach (lessons/*.md).
 id: go
 name: Go
 version: 1
@@ -9,10 +8,7 @@ description: >
   Interface design lives in the solid skill (Interface Segregation), since
   it's the same question either way.
 
-# kind: deterministic -> computed by an analyzer, confidence is always 1.0
-# kind: ai            -> needs judgment; the LLM must cite evidence from the code
-# analyzer (deterministic only): goast | semgrep | treesitter | metric
-# lesson: file name (without .md) in lessons/
+# kind: deterministic (analyzer: goast|semgrep|treesitter|metric) or ai; lesson = file in lessons/
 checks:
   - id: ignored-error
     title: Error return value is ignored

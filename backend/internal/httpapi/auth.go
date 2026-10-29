@@ -14,7 +14,7 @@ import (
 const (
 	sessionCookieName = "pullwise_session"
 	stateCookieName   = "pullwise_oauth_state"
-	stateCookieMaxAge = 5 * 60 // 5 minutes: only needs to survive the redirect to GitHub and back
+	stateCookieMaxAge = 5 * 60
 )
 
 // AuthService is what the auth handlers need from the login use case.
@@ -26,9 +26,6 @@ type AuthService interface {
 	UserGitHubToken(ctx context.Context, userID string) (string, error)
 }
 
-// viewerContext returns the request's context marked with who is asking, and
-// that user (nil if anonymous). Reviews made while signed in are private to
-// their creator, so every review endpoint must read and write through it.
 func (a *API) viewerContext(r *http.Request) (context.Context, *auth.User) {
 	user := a.sessionUser(r)
 	if user == nil {
@@ -37,8 +34,6 @@ func (a *API) viewerContext(r *http.Request) (context.Context, *auth.User) {
 	return review.WithViewer(r.Context(), user.ID), user
 }
 
-// handleLogin redirects the browser to GitHub, after setting a short-lived
-// cookie holding the CSRF state value Callback will check for.
 func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if a.auth == nil {
 		writeError(w, http.StatusServiceUnavailable, "auth_disabled", "GitHub login is not configured on this server.")
@@ -99,8 +94,6 @@ func (a *API) handleCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, a.frontendURL, http.StatusFound)
 }
 
-// handleMe reports who is logged in, or {"user": null} if no one is — this
-// is a status check, not a protected resource, so it always answers 200.
 func (a *API) handleMe(w http.ResponseWriter, r *http.Request) {
 	user := a.sessionUser(r)
 	if user == nil {
@@ -123,9 +116,6 @@ func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// sessionUser resolves the session cookie to a user, or nil if there isn't
-// one, it's invalid, or auth isn't configured. Handlers that want a user
-// without requiring one (like handleMe) use this directly.
 func (a *API) sessionUser(r *http.Request) *auth.User {
 	if a.auth == nil {
 		return nil

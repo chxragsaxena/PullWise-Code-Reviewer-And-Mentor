@@ -35,8 +35,7 @@ type analysisError struct{ err error }
 func (e *analysisError) Error() string { return "analysis failed: " + e.err.Error() }
 func (e *analysisError) Unwrap() error { return e.err }
 
-// run processes one review to completion. It always leaves the review in a
-// terminal state, whatever goes wrong, so a panic never kills a worker.
+// run processes one review to completion and always leaves it in a terminal state.
 func (s *Service) run(j job) {
 	id, ref := j.id, j.ref
 	defer func() {
@@ -143,7 +142,7 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 	return findings, closing, nil
 }
 
-// orderedSkills puts the user's own rules first, then the rest by id, so a rate limit never drops them.
+// orderedSkills puts the user's own rules first so a rate limit never drops them.
 func orderedSkills(selected map[string]skills.Skill) []skills.Skill {
 	out := make([]skills.Skill, 0, len(selected))
 	for _, sk := range selected {
@@ -185,11 +184,7 @@ func hasAICheck(selected map[string]skills.Skill) bool {
 	return false
 }
 
-// runAI evaluates every selected skill's kind: ai checks against the files
-// that skill applies to. A provider error is logged and treated as "this
-// skill's AI pass found nothing" rather than failing the review: the
-// deterministic findings are already complete and valuable on their own, and
-// one flaky or rate-limited call should not throw them away.
+// runAI evaluates each skill's AI checks; a provider error is logged and skipped, not fatal.
 func (s *Service) runAI(ctx context.Context, selected map[string]skills.Skill, files []review.ChangedFile, related []ai.ContextSnippet) []review.Finding {
 	var out []review.Finding
 	for _, sk := range orderedSkills(selected) {
@@ -260,7 +255,6 @@ func (s *Service) selectSkills(files []github.ChangedFile) map[string]skills.Ski
 }
 
 // download fetches file contents at the PR's head commit, a few at a time.
-// Files over the size cap are skipped; any other failure fails the review.
 func (s *Service) download(ctx context.Context, ref github.PullRequestRef, sha string, files []github.ChangedFile) ([]review.ChangedFile, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -312,11 +306,7 @@ func (s *Service) download(ctx context.Context, ref github.PullRequestRef, sha s
 	return out, nil
 }
 
-// normalize turns raw analyzer output into stored findings. Analyzers only say
-// what they saw; the skill definition decides severity, source, confidence,
-// titles and lesson. Findings that do not match a selected skill's deterministic
-// check, or that are invalid, are dropped with a warning: they indicate a bug in
-// an analyzer, which should not break the whole review.
+// normalize turns analyzer output into stored findings, dropping invalid ones.
 func (s *Service) normalize(raw []review.Finding, selected map[string]skills.Skill) []review.Finding {
 	var out []review.Finding
 	for _, f := range raw {
@@ -345,10 +335,7 @@ func (s *Service) normalize(raw []review.Finding, selected map[string]skills.Ski
 	return out
 }
 
-// normalizeAI is normalize's counterpart for the AI pass: it requires a
-// kind: ai check (never a deterministic one — an analyzer output claiming an
-// AI check, or vice versa, indicates a bug and is dropped) and keeps the
-// model's own confidence instead of forcing 1.0.
+// normalizeAI is normalize's counterpart for the AI pass; it requires a kind: ai check.
 func (s *Service) normalizeAI(raw []review.Finding, selected map[string]skills.Skill) []review.Finding {
 	var out []review.Finding
 	for _, f := range raw {
@@ -376,8 +363,7 @@ func (s *Service) normalizeAI(raw []review.Finding, selected map[string]skills.S
 	return out
 }
 
-// sortFindings orders a review's combined findings: most severe first, then
-// by file and line, stably so equal-ranked findings keep a predictable order.
+// sortFindings orders findings by severity, then file and line, stably.
 func sortFindings(findings []review.Finding) {
 	sort.SliceStable(findings, func(i, j int) bool {
 		a, b := findings[i], findings[j]
@@ -413,8 +399,7 @@ func (s *Service) transition(ctx context.Context, id string, status review.Statu
 	return nil
 }
 
-// complete saves the findings and marks the review done. Saving must not be
-// cut short by the review's own timeout or by shutdown, so it has its own budget.
+// complete saves the findings and marks the review done, with its own time budget.
 func (s *Service) complete(id string, findings []review.Finding, message string) {
 	ctx, cancel := recordContext(s.baseCtx)
 	defer cancel()
@@ -441,14 +426,12 @@ func (s *Service) fail(id, code, message string) {
 	s.broker.Publish(id, review.Event{Status: review.StatusFailed, Message: message, At: time.Now()})
 }
 
-// recordContext gives database writes their own short deadline, detached from
-// the review's cancellation so a timeout or shutdown can still be recorded.
+// recordContext gives database writes their own deadline, detached from cancellation.
 func recordContext(parent context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(parent), recordTimeout)
 }
 
-// classify maps an error to the stable code and the user-facing message stored
-// on the review. Internal details stay in the logs.
+// classify maps an error to the stable code and user-facing message stored on the review.
 func classify(err error) (code, message string) {
 	var analysis *analysisError
 	switch {

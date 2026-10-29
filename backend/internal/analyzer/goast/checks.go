@@ -10,11 +10,6 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
-// importedName returns the local identifier a package is imported under: its
-// alias if it has one, otherwise the default (the path's last element). It
-// reports false when the package is not imported, or is dot- or blank-imported
-// — a dot import has no selector name, so the checks below (which all look for
-// pkg.Name) cannot see uses of it.
 func importedName(f *ast.File, path string) (string, bool) {
 	for _, imp := range f.Imports {
 		p, err := strconv.Unquote(imp.Path.Value)
@@ -43,8 +38,6 @@ func isSelector(e ast.Expr, pkg, name string) bool {
 	return ok && id.Name == pkg && sel.Sel.Name == name
 }
 
-// funcLabel names a function for messages, including its receiver type: "f",
-// "(T).m" or "(*T).m".
 func funcLabel(fd *ast.FuncDecl) string {
 	if fd.Recv == nil || len(fd.Recv.List) == 0 {
 		return fd.Name.Name
@@ -62,15 +55,6 @@ func funcLabel(fd *ast.FuncDecl) string {
 
 // --- ignored-error -----------------------------------------------------------
 
-// checkIgnoredError flags `a, _ := f()`, where the discarded value sits in the
-// position Go convention reserves for an error: the last of two or more
-// results of a single call.
-//
-// This is a syntactic heuristic. Without full type information it cannot know
-// the discarded value's real type, so a call whose last result genuinely is
-// not an error (say, a `(value, ok)` lookup) can also trigger it — the
-// message says so. It never fires for map-index or type-assertion comma-ok
-// forms, since neither is a call expression.
 func checkIgnoredError(src *source, stmt *ast.AssignStmt) (review.Finding, bool) {
 	if len(stmt.Lhs) < 2 || len(stmt.Rhs) != 1 {
 		return review.Finding{}, false
@@ -101,8 +85,6 @@ type param struct {
 	typ ast.Expr
 }
 
-// flattenParams expands a parameter list into one entry per name, since a
-// single field can declare several names sharing a type (`a, b context.Context`).
 func flattenParams(fl *ast.FieldList) []param {
 	if fl == nil {
 		return nil
@@ -120,9 +102,6 @@ func flattenParams(fl *ast.FieldList) []param {
 	return out
 }
 
-// checkContextNotFirst flags a function whose context.Context parameter is
-// not the first one. A function with no context.Context parameter at all is
-// not this check's concern.
 func checkContextNotFirst(src *source, fd *ast.FuncDecl, ctxPkg string) (review.Finding, bool) {
 	if fd.Body == nil {
 		return review.Finding{}, false
@@ -149,9 +128,6 @@ func checkContextNotFirst(src *source, fd *ast.FuncDecl, ctxPkg string) (review.
 
 // --- http-call-without-context ----------------------------------------------
 
-// httpFuncsWithoutContext are the net/http package-level functions that have
-// no way to accept a context, unlike a request built with
-// http.NewRequestWithContext.
 var httpFuncsWithoutContext = map[string]bool{"Get": true, "Post": true, "Head": true, "PostForm": true}
 
 func checkHTTPWithoutContext(src *source, call *ast.CallExpr, httpPkg string) (review.Finding, bool) {
@@ -174,10 +150,6 @@ func checkHTTPWithoutContext(src *source, call *ast.CallExpr, httpPkg string) (r
 
 // --- high-complexity ----------------------------------------------------------
 
-// checkHighComplexity flags a function whose cyclomatic complexity exceeds
-// threshold. Complexity starts at 1 and gains 1 for each branch — if, for,
-// range, a switch/select case, and each &&/|| — matching the widely used
-// gocyclo definition.
 func checkHighComplexity(src *source, fd *ast.FuncDecl, threshold int) (review.Finding, bool) {
 	if fd.Body == nil {
 		return review.Finding{}, false

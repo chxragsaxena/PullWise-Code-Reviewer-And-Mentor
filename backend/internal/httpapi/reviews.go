@@ -35,10 +35,6 @@ func (a *API) createReview(w http.ResponseWriter, r *http.Request) {
 
 	ctx, user := a.viewerContext(r)
 	if user != nil {
-		// Use the user's own GitHub access (private repos, their rate limit).
-		// If it can't be had — expired, or never stored — carry on as the
-		// server's anonymous client: public PRs still work, and the review is
-		// still the user's own.
 		token, err := a.auth.UserGitHubToken(ctx, user.ID)
 		switch {
 		case err == nil:
@@ -103,8 +99,6 @@ func (a *API) getFinding(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toFindingDetailDTO(detail))
 }
 
-// writeServiceError maps service errors to the documented status and code.
-// Anything unexpected is logged in full but reported generically.
 func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidPRURL):
@@ -124,9 +118,6 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-// clientKey identifies the caller for rate limiting: the connection's address
-// without the port. Forwarding headers are deliberately not trusted, because any
-// client can forge them.
 func clientKey(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

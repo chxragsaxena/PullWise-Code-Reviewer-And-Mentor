@@ -43,9 +43,6 @@ func main() {
 }
 
 func run() error {
-	// Real environment variables win over .env; the file is only a convenience.
-	// It is looked up here and in the parent, because the repo's .env sits beside
-	// backend/ when running from there.
 	if loaded, err := config.LoadDotEnv(".env", "../.env"); err != nil {
 		return fmt.Errorf("load .env: %w", err)
 	} else if len(loaded) > 0 {
@@ -80,8 +77,6 @@ func run() error {
 	if err := st.SyncSkills(ctx, append(slices.Clone(loadedSkills), rules.Placeholder())); err != nil {
 		return err
 	}
-	// Reviews still in progress belong to a process that no longer exists. This
-	// assumes a single server instance; with several, do it only on one of them.
 	if n, err := st.FailInterrupted(ctx); err != nil {
 		return err
 	} else if n > 0 {
@@ -95,17 +90,11 @@ func run() error {
 		slog.Warn("GITHUB_TOKEN is not set: GitHub allows only 60 API requests per hour without one")
 	}
 
-	// go/ast covers the Go skill's deterministic checks; tree-sitter covers
-	// TypeScript's (Semgrep, for pattern-based checks, isn't built yet).
 	analyzers := []review.StaticAnalyzer{
 		goast.New(goast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "go")}),
 		tsast.New(tsast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "typescript")}),
 	}
 
-	// The AI pass (kind: ai checks) runs on Groq, free and fast; see
-	// internal/ai/groq.go for why. Nil disables it entirely if no key is set.
-	// The system prompt lives in skills/system_prompt.md, editable like any
-	// other skill/lesson file, with a built-in fallback if it's ever removed.
 	systemPrompt, err := ai.LoadSystemPrompt(os.DirFS(cfg.SkillsDir))
 	if err != nil {
 		return fmt.Errorf("load system prompt: %w", err)
@@ -118,9 +107,6 @@ func run() error {
 		slog.Warn("GROQ_API_KEY is not set: the AI review pass is disabled, reviews will be deterministic-only")
 	}
 
-	// The knowledge service (a separate repo, pullwise-knowledge) lets the AI pass
-	// see code related to a change from the rest of the repository. Optional:
-	// without it reviews see only the diff.
 	var kb service.Knowledge
 	if cfg.KnowledgeURL != "" {
 		client, err := newKnowledgeClient(cfg)
@@ -149,9 +135,6 @@ func run() error {
 		httpapi.WithCreateRateLimit(cfg.CreateRatePerMinute, cfg.CreateBurst),
 	}
 
-	// GitHub OAuth login (V2) is optional: without a client ID, every
-	// /auth/* route degrades to "not configured" / "not logged in", and the
-	// rest of the app (anonymous public-PR review) is unaffected.
 	if cfg.GitHubOAuthClientID != "" {
 		key, err := auth.DecodeKey(cfg.SessionSecret)
 		if err != nil {
@@ -202,8 +185,6 @@ func run() error {
 		slog.Info("shutting down")
 	}
 
-	// Stop taking requests first, then let running reviews finish, then the
-	// deferred db.Close runs last so reviews can still save their results.
 	httpCtx, cancelHTTP := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancelHTTP()
 	if err := srv.Shutdown(httpCtx); err != nil {
@@ -213,8 +194,6 @@ func run() error {
 	return nil
 }
 
-// newKnowledgeClient builds the client for the knowledge service, over TLS (and
-// mutual TLS, if a client certificate is configured) when a CA is given.
 func newKnowledgeClient(cfg config.Config) (*knowledge.Client, error) {
 	var opts []knowledge.Option
 	if cfg.KnowledgeTLSCAFile != "" || cfg.KnowledgeTLSCertFile != "" {
@@ -231,9 +210,6 @@ func newKnowledgeClient(cfg config.Config) (*knowledge.Client, error) {
 	return client, nil
 }
 
-// complexityThreshold reads a skill's high-complexity threshold from its
-// skill.yaml, so the analyzer and the skill definition cannot drift apart.
-// It returns 0 (the analyzer's own default) if the skill or check is missing.
 func complexityThreshold(loaded []skills.Skill, skillID string) int {
 	for _, sk := range loaded {
 		if sk.ID != skillID {

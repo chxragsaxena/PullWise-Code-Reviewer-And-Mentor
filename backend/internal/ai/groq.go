@@ -12,19 +12,11 @@ import (
 	"time"
 )
 
-// DefaultGroqModel is used unless overridden. gpt-oss-120b supports strict
-// JSON-schema structured output (constrained decoding, not best-effort) and
-// runs on Groq's hardware at roughly 470-480 tokens/sec — chosen over
-// Hugging Face's Inference Providers because Groq's own free tier (14,400
-// requests/day, no card) is far more usable than HF's $0.10/month credit;
-// see docs/TRACKER.md for the comparison.
+// DefaultGroqModel is used unless overridden.
 const DefaultGroqModel = "openai/gpt-oss-120b"
 
 const groqDefaultBaseURL = "https://api.groq.com/openai/v1"
 
-// GroqProvider implements Provider over Groq's OpenAI-compatible chat
-// completions API using plain net/http: the wire format is a handful of
-// JSON fields, so a full SDK dependency buys nothing here.
 type GroqProvider struct {
 	apiKey       string
 	model        string
@@ -66,9 +58,6 @@ func NewGroqProvider(apiKey string, opts ...GroqOption) *GroqProvider {
 	}
 	return p
 }
-
-// Wire shapes for the OpenAI-compatible chat completions endpoint. Only the
-// fields this provider actually uses are declared.
 
 type groqRequest struct {
 	Model          string             `json:"model"`
@@ -119,10 +108,6 @@ func (e *GroqAPIError) Error() string {
 	return fmt.Sprintf("groq: %d %s: %s", e.StatusCode, e.Type, e.Message)
 }
 
-// Review asks the model to evaluate one skill's AI checks against the
-// changed files, via a strict JSON-schema response format — constrained
-// decoding guarantees the output matches the schema, so there is no prose or
-// best-effort JSON to recover from.
 func (p *GroqProvider) Review(ctx context.Context, input ReviewInput) ([]Finding, error) {
 	if len(input.Checks) == 0 {
 		return nil, nil

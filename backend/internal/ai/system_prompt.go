@@ -7,16 +7,8 @@ import (
 	"strings"
 )
 
-// systemPromptFile is looked up directly inside the skills directory
-// (alongside the per-skill folders, not inside one), the same place
-// skill.yaml files live, so the reviewer's voice and rules are a plain
-// editable file like everything else the product teaches from — no Go code
-// to touch, no rebuild needed beyond restarting the server.
 const systemPromptFile = "system_prompt.md"
 
-// defaultSystemPrompt is used until a system_prompt.md exists, and is what
-// skills/system_prompt.md starts out containing — edit that file to change
-// the reviewer's behavior.
 const defaultSystemPrompt = `You are a code reviewer. You review pull requests against a specific
 software-engineering skill and report only what the evidence in the diff supports.
 
@@ -32,9 +24,7 @@ Rules:
 - Only report issues covered by the checks listed below. Do not invent new checks.
 - If you find nothing worth reporting, call the tool with an empty findings list.`
 
-// LoadSystemPrompt reads system_prompt.md from fsys (typically the skills
-// directory). A missing, empty, or whitespace-only file is not an error — it
-// just means defaultSystemPrompt is used, so the product works unedited.
+// LoadSystemPrompt reads system_prompt.md from fsys (typically the skills directory).
 func LoadSystemPrompt(fsys fs.FS) (string, error) {
 	data, err := fs.ReadFile(fsys, systemPromptFile)
 	if errors.Is(err, fs.ErrNotExist) {

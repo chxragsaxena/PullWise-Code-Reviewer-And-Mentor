@@ -10,11 +10,6 @@ import (
 const subscriberBuffer = 16
 
 // Broker fans review status events out to live subscribers, in memory.
-//
-// It carries no history: the database is the source of truth for the current
-// status, and a new subscriber reads that first. A subscriber that falls too far
-// behind is disconnected rather than blocking the pipeline; it simply reconnects
-// and is told the current status again.
 type Broker struct {
 	mu   sync.Mutex
 	subs map[string]map[*subscription]struct{}
@@ -30,9 +25,7 @@ func NewBroker() *Broker {
 	return &Broker{subs: make(map[string]map[*subscription]struct{})}
 }
 
-// Subscribe returns a channel of events for one review and a function that
-// stops the subscription. The channel is closed by cancel, or by the broker if
-// the subscriber cannot keep up.
+// Subscribe returns a channel of events for one review and a cancel function.
 func (b *Broker) Subscribe(reviewID string) (<-chan review.Event, func()) {
 	sub := &subscription{ch: make(chan review.Event, subscriberBuffer)}
 

@@ -110,8 +110,6 @@ logger.log("not console, must not be flagged");
 }
 
 func TestUnhandledPromise(t *testing.T) {
-	// loadData() stands in for any promise-returning call, so this test
-	// isolates .then()/.catch() handling from the unrelated fetch-signal check.
 	const src = `
 loadData().then(r => use(r));
 loadData().then(r => use(r)).catch(e => {});
@@ -146,8 +144,6 @@ fetch(url, opts);
 }
 
 func TestFetchWithVariableOptionsIsNotFlagged(t *testing.T) {
-	// opts might contain a signal; we can't tell without evaluating it, so we
-	// deliberately don't guess (favors fewer false positives).
 	const src = `fetch(url, opts);`
 	if findings := analyze(t, Config{}, "", src); len(findings) != 0 {
 		t.Fatalf("a non-literal options argument must not be flagged: %v", findings)
@@ -214,8 +210,6 @@ function Greeting(name: any) {
 func TestFileThatFailsToParseIsSkippedNotFatal(t *testing.T) {
 	findings, err := New(Config{}).Analyze(context.Background(), review.AnalysisInput{
 		Files: []review.ChangedFile{
-			// tree-sitter is error-tolerant, so force a real parser failure
-			// with a context so short the parse can't finish.
 			{Path: "fine.ts", Language: lang.TypeScript, Content: "const x = 1 == 2;\n"},
 		},
 	})

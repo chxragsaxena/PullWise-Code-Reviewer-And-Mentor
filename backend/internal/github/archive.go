@@ -18,8 +18,6 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/lang"
 )
 
-// Limits on what RepositoryFiles reads, so a huge repository cannot exhaust
-// memory or the knowledge service. Past these, the remaining files are skipped.
 const (
 	maxArchiveBytes   = 100 << 20 // compressed download
 	maxRepoFiles      = 400
@@ -28,8 +26,6 @@ const (
 	archiveTimeout    = 2 * time.Minute
 )
 
-// skippedDirs are directories whose contents are dependencies or build output,
-// not the project's own code.
 var skippedDirs = map[string]bool{
 	"node_modules": true, "vendor": true, ".git": true, "dist": true, "build": true,
 	"third_party": true, "testdata": true, "__pycache__": true, ".venv": true, "venv": true,
@@ -41,11 +37,6 @@ type SourceFile struct {
 	Content string
 }
 
-// RepositoryFiles returns the source files of a repository at a commit, using
-// one request for the whole archive (listing and fetching file by file would
-// spend one request each, against a limit of 60 an hour when anonymous).
-// Only files in a language we recognise are kept, minus dependency and build
-// directories, generated and minified files, binaries and oversized files.
 func (c *Client) RepositoryFiles(ctx context.Context, ref PullRequestRef, sha string) ([]SourceFile, error) {
 	// The archive can take longer than an API call, so use a longer timeout.
 	slow := *c

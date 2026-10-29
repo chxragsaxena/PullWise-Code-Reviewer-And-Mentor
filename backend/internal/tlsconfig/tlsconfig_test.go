@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-// selfSigned writes a self-signed certificate and key, which can serve as both a
-// CA to trust and a client certificate to present.
 func selfSigned(t *testing.T, dir string) (certFile, keyFile string) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
