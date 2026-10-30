@@ -45,14 +45,21 @@ func archiveClient(t *testing.T, archive []byte, gotAuth, gotPath *string) *Clie
 	}), WithToken("tok"))
 }
 
-func TestRepositoryFilesKeepsOnlyProjectSourceAndStripsTheTopFolder(t *testing.T) {
+func TestRepositoryFilesKeepsProjectSourceAndDocsAndStripsTheTopFolder(t *testing.T) {
 	archive := tarball(t, map[string]string{
 		"main.go":                      "package main",
 		"internal/util/retry.go":       "package util",
 		"web/App.tsx":                  "export const A = 1",
 		"scripts/tool.py":              "print(1)",
 		"README.md":                    "# docs",
+		"docs/api.md":                  "# api",
+		"migrations/0001.sql":          "CREATE TABLE t ();",
+		"docker-compose.yml":           "services: {}",
+		"Dockerfile":                   "FROM scratch",
+		".env.example":                 "KEY=",
 		"config.json":                  "{}",
+		"LICENSE":                      "MIT",
+		"node_modules/pkg/README.md":   "# dep",
 		"node_modules/lib/index.js":    "x",
 		"vendor/dep/dep.go":            "package dep",
 		"dist/bundle.js":               "x",
@@ -77,12 +84,15 @@ func TestRepositoryFilesKeepsOnlyProjectSourceAndStripsTheTopFolder(t *testing.T
 	for _, f := range files {
 		got = append(got, f.Path)
 	}
-	want := []string{"deep/nested/dir/handler.java", "internal/util/retry.go", "main.go", "scripts/tool.py", "web/App.tsx"}
+	want := []string{".env.example", "Dockerfile", "README.md", "deep/nested/dir/handler.java", "docker-compose.yml", "docs/api.md",
+		"internal/util/retry.go", "main.go", "migrations/0001.sql", "scripts/tool.py", "web/App.tsx"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("files = %v\nwant    %v", got, want)
 	}
-	if files[2].Content != "package main" {
-		t.Errorf("content of main.go = %q", files[2].Content)
+	for _, f := range files {
+		if f.Path == "main.go" && f.Content != "package main" {
+			t.Errorf("content of main.go = %q", f.Content)
+		}
 	}
 	if gotPath != "/repos/owner/repo/tarball/abc123" {
 		t.Errorf("path = %q", gotPath)

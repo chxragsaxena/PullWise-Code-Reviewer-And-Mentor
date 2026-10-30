@@ -123,13 +123,23 @@ func (c *Client) Index(ctx context.Context, tenant, repo, ref string, files []Fi
 	return out, err
 }
 
+// Search finds the chunks closest to query; the service also uses the query's own words for keyword search.
 func (c *Client) Search(ctx context.Context, tenant, repo, query string, topK int, excludePaths []string) ([]Snippet, error) {
+	return c.search(ctx, tenant, repo, map[string]any{"query": query}, topK, excludePaths)
+}
+
+// SearchHybrid is Search with its own words for the keyword half; an empty keywords means vectors only.
+func (c *Client) SearchHybrid(ctx context.Context, tenant, repo, query, keywords string, topK int, excludePaths []string) ([]Snippet, error) {
+	return c.search(ctx, tenant, repo, map[string]any{"query": query, "keywords": keywords}, topK, excludePaths)
+}
+
+func (c *Client) search(ctx context.Context, tenant, repo string, body map[string]any, topK int, excludePaths []string) ([]Snippet, error) {
 	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 	defer cancel()
 	var out struct {
 		Results []Snippet `json:"results"`
 	}
-	body := map[string]any{"repo": repo, "query": query, "topK": topK, "excludePaths": excludePaths}
+	body["repo"], body["topK"], body["excludePaths"] = repo, topK, excludePaths
 	if err := c.do(ctx, http.MethodPost, "/v1/search", tenant, []string{"search"}, body, &out); err != nil {
 		return nil, err
 	}

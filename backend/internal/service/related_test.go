@@ -224,6 +224,17 @@ func TestKnowledgeIsNotUsedWithoutAnAIPassOrWhenNotConfigured(t *testing.T) {
 	}
 }
 
+func TestPickSnippetsLeavesDocsToAsk(t *testing.T) {
+	got := pickSnippets([]knowledge.Snippet{
+		{Path: "README.md", StartLine: 1, Score: 0.9},
+		{Path: "migrations/0001.sql", StartLine: 1, Score: 0.8},
+		{Path: "retry.go", StartLine: 1, Score: 0.1},
+	})
+	if len(got) != 1 || got[0].Path != "retry.go" {
+		t.Fatalf("got %v, want only the code file", got)
+	}
+}
+
 func TestPickSnippetsKeepsTheBestDistinctOnesUpToTheCap(t *testing.T) {
 	var found []knowledge.Snippet
 	for i, p := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {

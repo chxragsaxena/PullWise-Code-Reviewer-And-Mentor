@@ -151,10 +151,29 @@ cd frontend && npm test
 |---|---|
 | Public-PR review, dashboard, Go + TypeScript analyzers, AI pass | Done |
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
-| Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Not yet measured: how much it improves review quality (no retrieval-quality evaluation yet) |
+| Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Retrieval is measured (below); how much it improves review quality is not |
 | Your own review standards (per-user rules, snapshot per review) | Done and verified live |
 | Ask: repository Q&A chat with cited answers, beside every review and on its own page | Done and verified live. Needs the knowledge service; retrieval can miss code (not yet measured) |
 | GitHub App / webhooks | Not started |
+
+### Retrieval quality (Ask)
+
+`go run ./cmd/askeval` (needs the knowledge service and a Groq key) asks 33 questions about two
+repositories and checks whether a file that answers each is among the 6 excerpts the AI is given.
+One run, October 2026:
+
+| Search | recall@6 | MRR |
+|---|---|---|
+| Source files only, vectors only (before the changes below) | 85% | 0.63 |
+| Plus docs, SQL and config indexed, vectors only | 91% | 0.64 |
+| Plus keyword search, merged with vectors | 85% | 0.60 |
+| Plus the AI rewriting the question into search words | 97% | 0.74 |
+
+Read it with care: I wrote the questions and the expected files, 33 is small, the rewrite step is
+an AI call so a rerun can differ by a question or two, and the docs fix came from reading the
+misses. Keyword search alone made things slightly worse; it helped only with the rewrite.
+Questions about code are still missed sometimes (for example, "How are GitHub OAuth tokens
+encrypted?" never returned `crypto.go`).
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the
 model's own confidence); only Go and TypeScript have exact checks; sharing a private

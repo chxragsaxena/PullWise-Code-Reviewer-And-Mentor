@@ -36,6 +36,8 @@ const (
 	queryChars   = 1500
 	// answerQueryChars is how much of the previous answer joins a follow-up's search.
 	answerQueryChars = 500
+	// rewriteChars caps the AI-written search words.
+	rewriteChars = 300
 	// The pull request's own diff, shown when asking about a review.
 	maxDiffFiles     = 12
 	maxDiffChars     = 5000
@@ -61,7 +63,7 @@ func (e *InvalidError) Error() string { return e.Message }
 type Knowledge interface {
 	IndexedRef(ctx context.Context, tenant, repo string) (string, bool, error)
 	Index(ctx context.Context, tenant, repo, ref string, files []knowledge.File) (knowledge.IndexResult, error)
-	Search(ctx context.Context, tenant, repo, query string, topK int, excludePaths []string) ([]knowledge.Snippet, error)
+	SearchHybrid(ctx context.Context, tenant, repo, query, keywords string, topK int, excludePaths []string) ([]knowledge.Snippet, error)
 }
 
 // Repos reads repositories and pull requests from GitHub.
@@ -83,6 +85,9 @@ type Config struct {
 	Reviews   Reviews
 	Chat      ai.Chatter
 	Prompt    string
+	// VectorOnly and NoRewrite switch off parts of retrieval, to measure what each adds.
+	VectorOnly bool
+	NoRewrite  bool
 }
 
 // Service answers questions.
@@ -93,11 +98,14 @@ type Service struct {
 	chat    ai.Chatter
 	prompt  string
 	flight  singleflight.Group
+
+	vectorOnly, noRewrite bool
 }
 
 // New builds a Service.
 func New(cfg Config) *Service {
-	return &Service{kb: cfg.Knowledge, repos: cfg.Repos, reviews: cfg.Reviews, chat: cfg.Chat, prompt: cfg.Prompt}
+	return &Service{kb: cfg.Knowledge, repos: cfg.Repos, reviews: cfg.Reviews, chat: cfg.Chat, prompt: cfg.Prompt,
+		vectorOnly: cfg.VectorOnly, noRewrite: cfg.NoRewrite}
 }
 
 // Turn is one earlier message of the conversation.
@@ -166,11 +174,10 @@ func (s *Service) Ask(ctx context.Context, req Request) (Answer, error) {
 	if err != nil {
 		return Answer{}, err
 	}
-	found, err := s.kb.Search(ctx, tenant, repo, searchQuery(req), topK, nil)
+	excerpts, err := s.retrieve(ctx, tenant, repo, req)
 	if err != nil {
-		return Answer{}, fmt.Errorf("search the repository: %w", err)
+		return Answer{}, err
 	}
-	excerpts := pickExcerpts(found)
 
 	var changed []github.ChangedFile
 	if rv != nil {
@@ -198,6 +205,38 @@ func (s *Service) Ask(ctx context.Context, req Request) (Answer, error) {
 		})
 	}
 	return Answer{Text: text, Sources: sources, Repo: repo, IndexedRef: indexed}, nil
+}
+
+// retrieve finds the code excerpts that best match the question.
+func (s *Service) retrieve(ctx context.Context, tenant, repo string, req Request) ([]knowledge.Snippet, error) {
+	query, keywords := s.searchInputs(ctx, req)
+	found, err := s.kb.SearchHybrid(ctx, tenant, repo, query, keywords, topK, nil)
+	if err != nil {
+		return nil, fmt.Errorf("search the repository: %w", err)
+	}
+	return pickExcerpts(found), nil
+}
+
+// Retrieve returns the excerpts Ask would show the AI for a repository question, without answering it.
+// It exists so retrieval quality can be measured.
+func (s *Service) Retrieve(ctx context.Context, req Request) ([]knowledge.Snippet, error) {
+	if s.kb == nil || s.chat == nil || s.repos == nil {
+		return nil, ErrUnavailable
+	}
+	req, err := normalize(req)
+	if err != nil {
+		return nil, err
+	}
+	owner, name, _ := strings.Cut(req.Repo, "/")
+	if owner == "" || name == "" {
+		return nil, &InvalidError{"Say which repository to ask about."}
+	}
+	repo := strings.ToLower(owner + "/" + name)
+	tenant := knowledge.Tenant(review.ViewerFrom(ctx))
+	if _, err := s.ensureIndexed(ctx, tenant, repo, github.PullRequestRef{Owner: owner, Repo: name}); err != nil {
+		return nil, err
+	}
+	return s.retrieve(ctx, tenant, repo, req)
 }
 
 // changedFiles fetches the pull request's changed files; if GitHub fails the answer just lacks the diff.
@@ -313,6 +352,46 @@ func searchQuery(req Request) string {
 		}
 	}
 	return clip(strings.Join(parts, "\n"), queryChars)
+}
+
+// rewritePrompt asks for search words, because questions rarely share words with the code that answers them.
+const rewritePrompt = `You turn a question about a software repository into search keywords for finding the code that answers it.
+Output one line of at most 15 space-separated words: likely identifier names, file or package names,
+technology and provider names, and synonyms for the question's concepts. No punctuation, no explanation.`
+
+// searchInputs builds the text to embed and the words for keyword search. The words come from an AI
+// rewrite of the question plus the question itself; if the rewrite fails the search still runs without it.
+func (s *Service) searchInputs(ctx context.Context, req Request) (query, keywords string) {
+	query = searchQuery(req)
+	if s.vectorOnly {
+		return query, ""
+	}
+	var terms string
+	if !s.noRewrite {
+		terms = s.rewrite(ctx, req)
+	}
+	if terms != "" {
+		query = clip(query+"\nSearch terms: "+terms, queryChars+rewriteChars)
+	}
+	return query, clip(terms+" "+req.Question, queryChars)
+}
+
+// rewrite returns search words for the question, or "" if the AI could not provide them.
+func (s *Service) rewrite(ctx context.Context, req Request) string {
+	msg := req.Question
+	for i := len(req.History) - 1; i >= 0; i-- {
+		if req.History[i].Role == "user" {
+			msg = "Earlier question: " + clip(req.History[i].Content, 300) + "\nQuestion: " + req.Question
+			break
+		}
+	}
+	out, err := s.chat.Chat(ctx, rewritePrompt, []ai.Message{{Role: "user", Content: msg}})
+	if err != nil {
+		slog.Warn("could not rewrite a question into search words; searching with the question alone", "error", err)
+		return ""
+	}
+	line, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	return clip(strings.TrimSpace(line), rewriteChars)
 }
 
 // pickExcerpts keeps the best matches that fit the code budget, in order.

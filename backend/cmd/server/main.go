@@ -109,12 +109,13 @@ func run() error {
 	}
 
 	var kb service.Knowledge
+	var askKB ask.Knowledge
 	if cfg.KnowledgeURL != "" {
 		client, err := newKnowledgeClient(cfg)
 		if err != nil {
 			return err
 		}
-		kb = client
+		kb, askKB = client, client
 		slog.Info("repository knowledge base enabled", "url", cfg.KnowledgeURL, "mutual_tls", cfg.KnowledgeTLSCertFile != "")
 	} else {
 		slog.Warn("KNOWLEDGE_URL is not set: the AI pass will not see code beyond the diff")
@@ -137,7 +138,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load ask prompt: %w", err)
 	}
-	askSvc := ask.New(ask.Config{Knowledge: kb, Repos: ghClient, Reviews: svc, Chat: chatter, Prompt: askPrompt})
+	askSvc := ask.New(ask.Config{Knowledge: askKB, Repos: ghClient, Reviews: svc, Chat: chatter, Prompt: askPrompt})
 
 	apiOpts := []httpapi.Option{
 		httpapi.WithRules(rules.NewService(st)),

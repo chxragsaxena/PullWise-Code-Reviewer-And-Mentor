@@ -9,6 +9,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/knowledge"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/lang"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/review"
 )
 
@@ -112,7 +113,8 @@ func pickSnippets(found []knowledge.Snippet) []ai.ContextSnippet {
 	var out []ai.ContextSnippet
 	for _, sn := range found {
 		k := key{sn.Path, sn.StartLine}
-		if seen[k] {
+		// The index also holds docs for Ask; a code review only wants related code.
+		if seen[k] || lang.Detect(sn.Path) == "" {
 			continue
 		}
 		seen[k] = true

@@ -200,6 +200,8 @@ It needs `KNOWLEDGE_URL`; without it the route is not registered.
 - Limits: question 1 to 1,000 characters, at most 6 history turns of 4,000 characters each.
 - The first question on a repository downloads and indexes its default branch (1 to 2 minutes
   with the free Cohere key); later ones take a few seconds.
+- The index holds source files plus docs and config (README, `.md`, `.sql`, `.yml`, Dockerfile,
+  `.env.example`, `go.mod`, `package.json`), so questions like "how do I run it?" can be answered.
 - `sources` lists only the excerpts the answer cites. If nothing relevant is found the answer says so.
 - Signed-in users search their own index (private repos); anonymous users the shared public one.
 - Errors: `400 invalid_request`, `404 repo_not_found` / `review_not_found`, `422 no_source`,

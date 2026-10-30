@@ -122,9 +122,20 @@ func readArchive(r io.Reader) ([]SourceFile, error) {
 	return files, nil
 }
 
+// Docs and project files are indexed so questions like "how do I run it?" have something to find.
+var (
+	docExtensions = map[string]bool{".md": true, ".mdx": true, ".rst": true, ".sql": true, ".yml": true, ".yaml": true, ".toml": true}
+	docBaseNames  = map[string]bool{"Dockerfile": true, "Makefile": true, ".env.example": true, "go.mod": true, "package.json": true}
+)
+
+// isDoc reports whether name is documentation or project configuration rather than source code.
+func isDoc(name string) bool {
+	return docExtensions[strings.ToLower(path.Ext(name))] || docBaseNames[path.Base(name)]
+}
+
 // wanted reports whether a file at name (relative to the repo root) is worth indexing.
 func wanted(name string, size int64) bool {
-	if size == 0 || size > maxRepoFileBytes || lang.Detect(name) == "" {
+	if size == 0 || size > maxRepoFileBytes || (lang.Detect(name) == "" && !isDoc(name)) {
 		return false
 	}
 	for _, dir := range strings.Split(path.Dir(name), "/") {

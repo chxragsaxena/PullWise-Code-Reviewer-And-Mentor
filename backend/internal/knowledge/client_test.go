@@ -129,6 +129,30 @@ func TestSearchAsksOnlyForTheSearchScopeAndParsesResults(t *testing.T) {
 	}
 }
 
+func TestSearchHybridSendsTheKeywordsAlongside(t *testing.T) {
+	var body map[string]any
+	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		fmt.Fprint(w, `{"results":[]}`)
+	})
+	if _, err := c.SearchHybrid(context.Background(), "public", "o/r", "which llm", "cohere embed", 6, nil); err != nil {
+		t.Fatal(err)
+	}
+	if body["query"] != "which llm" || body["keywords"] != "cohere embed" || body["topK"] != float64(6) {
+		t.Errorf("body = %v", body)
+	}
+	if _, err := c.SearchHybrid(context.Background(), "public", "o/r", "q", "", 6, nil); err != nil || body["keywords"] != "" {
+		t.Errorf("an empty keywords must be sent as such (vectors only): %v, %v", body, err)
+	}
+	body = nil
+	if _, err := c.Search(context.Background(), "public", "o/r", "q", 6, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := body["keywords"]; has {
+		t.Error("Search must leave keywords out so the service uses the query's own words")
+	}
+}
+
 func TestIndexedRefReportsTheRefOrThatThereIsNone(t *testing.T) {
 	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/v1/repos/acme/shop" {

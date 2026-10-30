@@ -24,6 +24,7 @@ type fakeKB struct {
 	searchErr  error
 	indexCalls []string
 	searches   []string
+	keywords   []string
 	tenants    []string
 	checks     int
 }
@@ -48,10 +49,11 @@ func (f *fakeKB) Index(_ context.Context, tenant, repo, ref string, files []know
 	return knowledge.IndexResult{Status: "indexed", Files: len(files)}, nil
 }
 
-func (f *fakeKB) Search(_ context.Context, tenant, repo, query string, _ int, _ []string) ([]knowledge.Snippet, error) {
+func (f *fakeKB) SearchHybrid(_ context.Context, tenant, repo, query, keywords string, _ int, _ []string) ([]knowledge.Snippet, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.searches = append(f.searches, tenant+"|"+repo+"|"+query)
+	f.keywords = append(f.keywords, keywords)
 	return f.results, f.searchErr
 }
 
@@ -97,17 +99,25 @@ type fakeReviews struct {
 
 func (f fakeReviews) Get(context.Context, string) (review.Review, error) { return f.rv, f.err }
 
+// fakeChat answers the question-rewrite call with rewrite and every other call with reply.
 type fakeChat struct {
-	reply   string
-	err     error
-	system  string
-	got     []ai.Message
-	callsMu sync.Mutex
+	reply      string
+	err        error
+	rewrite    string
+	rewriteErr error
+	system     string
+	got        []ai.Message
+	rewrites   []string // message of each rewrite call
+	callsMu    sync.Mutex
 }
 
 func (f *fakeChat) Chat(_ context.Context, system string, msgs []ai.Message) (string, error) {
 	f.callsMu.Lock()
 	defer f.callsMu.Unlock()
+	if system == rewritePrompt {
+		f.rewrites = append(f.rewrites, msgs[0].Content)
+		return f.rewrite, f.rewriteErr
+	}
 	f.system, f.got = system, msgs
 	return f.reply, f.err
 }
@@ -158,6 +168,51 @@ func TestAskingAboutAnUnindexedRepoIndexesItsDefaultBranchThenAnswersWithCitatio
 		if !strings.Contains(last.Content, want) {
 			t.Errorf("the message to the AI is missing %q:\n%s", want, last.Content)
 		}
+	}
+}
+
+func TestTheQuestionIsRewrittenIntoSearchWordsForBothHalvesOfTheSearch(t *testing.T) {
+	h := newHarness("ok")
+	h.chat.rewrite = "CohereEmbedder embedding model provider\nthis second line is ignored"
+
+	if _, err := h.svc.Ask(context.Background(), Request{Repo: "acme/shop", Question: "which llm does it use?"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.kb.keywords) != 1 || !strings.HasPrefix(h.kb.keywords[0], "CohereEmbedder embedding model provider ") ||
+		!strings.Contains(h.kb.keywords[0], "which llm does it use?") || strings.Contains(h.kb.keywords[0], "second line") {
+		t.Fatalf("keywords = %q", h.kb.keywords)
+	}
+	if q := h.kb.searches[0]; !strings.Contains(q, "which llm does it use?") || !strings.Contains(q, "Search terms: CohereEmbedder embedding model provider") {
+		t.Errorf("the text to embed = %q, want the question and the search terms", q)
+	}
+}
+
+func TestAFollowUpRewriteSeesTheEarlierQuestion(t *testing.T) {
+	h := newHarness("ok")
+	h.chat.rewrite = "retry"
+	history := []Turn{{"user", "how does retry work?"}, {"assistant", "It loops."}}
+
+	if _, err := h.svc.Ask(context.Background(), Request{Repo: "acme/shop", Question: "and the limit?", History: history}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.chat.rewrites[0]; !strings.Contains(got, "how does retry work?") || !strings.Contains(got, "and the limit?") {
+		t.Errorf("rewrite message = %q", got)
+	}
+}
+
+func TestARewriteThatFailsStillAnswersFromTheQuestionAlone(t *testing.T) {
+	h := newHarness("ok [1]")
+	h.chat.rewriteErr = errors.New("groq is down")
+
+	got, err := h.svc.Ask(context.Background(), Request{Repo: "acme/shop", Question: "How does retry work?"})
+	if err != nil || got.Text == "" {
+		t.Fatalf("Ask = %+v, %v; a failed rewrite must not fail the answer", got, err)
+	}
+	if len(h.kb.keywords) != 1 || strings.TrimSpace(h.kb.keywords[0]) != "How does retry work?" {
+		t.Errorf("keywords = %q, want just the question", h.kb.keywords)
+	}
+	if strings.Contains(h.kb.searches[0], "Search terms") {
+		t.Errorf("the text to embed carries search terms from a failed rewrite: %q", h.kb.searches[0])
 	}
 }
 
