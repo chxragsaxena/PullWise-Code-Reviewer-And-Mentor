@@ -195,6 +195,12 @@ func TestNewRejectsBadSettings(t *testing.T) {
 	}
 }
 
+func TestTenantIsTheUsersOwnOrTheSharedOne(t *testing.T) {
+	if Tenant("") != "public" || Tenant("42") != "u42" {
+		t.Fatalf("Tenant = %q, %q", Tenant(""), Tenant("42"))
+	}
+}
+
 func TestTokenRequiresATenant(t *testing.T) {
 	c, _ := New("http://x", secret, "i", "a")
 	c.now = func() time.Time { return time.Unix(1_000_000, 0) }

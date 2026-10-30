@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { AskPage } from "./pages/AskPage";
 import { FindingPage } from "./pages/FindingPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -14,6 +15,7 @@ export function App() {
         <Route path="reviews/:id" element={<ReviewPage />} />
         <Route path="reviews/:id/findings/:findingId" element={<FindingPage />} />
         <Route path="standards" element={<StandardsPage />} />
+        <Route path="ask" element={<AskPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -34,6 +34,10 @@ type API struct {
 	// rules is nil unless the user-standards endpoints are enabled.
 	rules RuleService
 
+	// ask is nil unless repository questions are enabled; askLimit throttles them per client.
+	ask      AskService
+	askLimit *limiter
+
 	done     chan struct{} // closed by BeginShutdown to end open event streams
 	doneOnce sync.Once
 }
@@ -68,6 +72,7 @@ func WithAuth(svc AuthService, frontendURL string, secureCookies bool) Option {
 func New(svc ReviewService, opts ...Option) *API {
 	a := &API{svc: svc, heartbeat: 15 * time.Second, done: make(chan struct{})}
 	WithCreateRateLimit(20, 10)(a)
+	WithAskRateLimit(10, 5)(a)
 	for _, opt := range opts {
 		opt(a)
 	}
@@ -91,6 +96,9 @@ func (a *API) Handler() http.Handler {
 	mux.Handle("/api/reviews/{id}/events", methods{http.MethodGet: a.streamEvents})
 	mux.Handle("/api/reviews/{id}/findings/{findingId}", methods{http.MethodGet: a.getFinding})
 
+	if a.ask != nil {
+		mux.Handle("/api/ask", methods{http.MethodPost: a.askQuestion})
+	}
 	if a.rules != nil {
 		mux.Handle("/api/rules", methods{http.MethodGet: a.listRules, http.MethodPost: a.createRule})
 		mux.Handle("/api/rules/{id}", methods{http.MethodPut: a.updateRule, http.MethodDelete: a.deleteRule})

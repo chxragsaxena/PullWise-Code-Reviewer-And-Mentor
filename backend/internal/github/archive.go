@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -54,6 +55,28 @@ func (c *Client) RepositoryFiles(ctx context.Context, ref PullRequestRef, sha st
 		return nil, fmt.Errorf("read archive of %s/%s: %w", ref.Owner, ref.Repo, err)
 	}
 	return files, nil
+}
+
+var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+// DefaultBranchSHA returns the latest commit of a repository's default branch.
+func (c *Client) DefaultBranchSHA(ctx context.Context, ref PullRequestRef) (string, error) {
+	apiPath := fmt.Sprintf("/repos/%s/%s/commits/HEAD", url.PathEscape(ref.Owner), url.PathEscape(ref.Repo))
+	resp, err := c.get(ctx, apiPath, nil, "application/vnd.github.sha")
+	if err != nil {
+		return "", fmt.Errorf("resolve default branch of %s/%s: %w", ref.Owner, ref.Repo, err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 256))
+	if err != nil {
+		return "", fmt.Errorf("read commit of %s/%s: %w", ref.Owner, ref.Repo, err)
+	}
+	sha := strings.TrimSpace(string(data))
+	if !shaPattern.MatchString(sha) {
+		return "", fmt.Errorf("resolve default branch of %s/%s: unexpected response", ref.Owner, ref.Repo)
+	}
+	return sha, nil
 }
 
 func readArchive(r io.Reader) ([]SourceFile, error) {

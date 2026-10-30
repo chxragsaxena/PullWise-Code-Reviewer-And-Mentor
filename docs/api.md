@@ -179,6 +179,33 @@ against them. Every route needs a session (`401 unauthorized` otherwise).
   Findings from them use skill id `custom` ("Your standards"), take the rule's severity, and
   show the rule's instructions as their lesson.
 
+## Ask (questions about a repository)
+
+`POST /api/ask` answers a question from the repository's indexed code (the knowledge service).
+It needs `KNOWLEDGE_URL`; without it the route is not registered.
+
+```json
+{ "repo": "owner/name", "reviewId": "7", "question": "How does retry work?",
+  "history": [{ "role": "user", "content": "…" }, { "role": "assistant", "content": "…" }] }
+```
+
+```json
+{ "answer": "It retries three times [1].", "repo": "owner/name", "indexedRef": "<commit sha>",
+  "sources": [{ "n": 1, "path": "util/retry.go", "startLine": 3, "endLine": 14,
+                "url": "https://github.com/owner/name/blob/<sha>/util/retry.go#L3-L14", "snippet": "…" }] }
+```
+
+- Send `repo` (`owner/name`) to ask about a repository, or `reviewId` to ask about a review: the
+  review's repository wins, and the pull request's findings and changed files are added.
+- Limits: question 1 to 1,000 characters, at most 6 history turns of 4,000 characters each.
+- The first question on a repository downloads and indexes its default branch (1 to 2 minutes
+  with the free Cohere key); later ones take a few seconds.
+- `sources` lists only the excerpts the answer cites. If nothing relevant is found the answer says so.
+- Signed-in users search their own index (private repos); anonymous users the shared public one.
+- Errors: `400 invalid_request`, `404 repo_not_found` / `review_not_found`, `422 no_source`,
+  `429 rate_limited` (10 per minute, burst 5, per address; `Retry-After`) / `github_rate_limited` /
+  `ai_busy`, `503 ask_unavailable`, `504 timeout`, `502 ask_failed`.
+
 ## Not in v1
 Private-repository access (added in V2, above), deleting reviews, sharing a private
 review, pagination beyond `limit`,

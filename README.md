@@ -27,6 +27,9 @@ private to you.
 - **Your own standards.** Signed-in users write review rules in plain English ("never call
   the database from a handler"); the AI checks their pull requests against them. Each review
   keeps a copy of the rules it used.
+- **Ask about the code.** A chat next to every finished review (findings on the left, chat on the
+  right) and an Ask page for any repository. Answers come from the indexed code with numbered
+  citations that link to the exact lines on GitHub; when the code does not say, it says so.
 
 ## Architecture
 
@@ -131,7 +134,7 @@ than breaking the app.
 | `GITHUB_TOKEN` | Raises the anonymous GitHub rate limit (60 to 5,000 requests/hour) |
 | `GITHUB_OAUTH_CLIENT_ID` / `_CLIENT_SECRET`, `SESSION_SECRET` | "Sign in with GitHub" and private-repo reviews (`SESSION_SECRET` is a base64 32-byte key) |
 | `PUBLIC_URL`, `SECURE_COOKIES` | Set when deploying behind a real domain (use `https`) |
-| `KNOWLEDGE_URL`, `KNOWLEDGE_JWT_SECRET` | Turns on the repository knowledge base (the separate service); the secret must match the service's `JWT_SECRET`. Optional `KNOWLEDGE_TLS_*` files enable mutual TLS |
+| `KNOWLEDGE_URL`, `KNOWLEDGE_JWT_SECRET` | Turns on the repository knowledge base (the separate service); the secret must match the service's `JWT_SECRET`. Optional `KNOWLEDGE_TLS_*` files enable mutual TLS. This also turns on Ask; `ASK_RATE_PER_MINUTE` / `ASK_BURST` limit it |
 
 See [.env.example](.env.example) for the full list.
 
@@ -150,6 +153,7 @@ cd frontend && npm test
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
 | Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Not yet measured: how much it improves review quality (no retrieval-quality evaluation yet) |
 | Your own review standards (per-user rules, snapshot per review) | Done and verified live |
+| Ask: repository Q&A chat with cited answers, beside every review and on its own page | Done and verified live. Needs the knowledge service; retrieval can miss code (not yet measured) |
 | GitHub App / webhooks | Not started |
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the

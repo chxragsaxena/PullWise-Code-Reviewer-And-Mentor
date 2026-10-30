@@ -248,9 +248,3 @@ func TestPickSnippetsKeepsTheBestDistinctOnesUpToTheCap(t *testing.T) {
 		seen[s.Path] = true
 	}
 }
-
-func TestTenantFor(t *testing.T) {
-	if tenantFor("") != "public" || tenantFor("42") != "u42" {
-		t.Fatalf("tenantFor = %q, %q", tenantFor(""), tenantFor("42"))
-	}
-}

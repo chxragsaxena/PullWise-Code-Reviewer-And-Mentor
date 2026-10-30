@@ -1,6 +1,7 @@
 import { ApiError, type ApiClient, type ProgressHandlers } from "./client";
 import {
   REVIEW_STATUSES,
+  type AskAnswer,
   type AuthUser,
   type FindingDetail,
   type Review,
@@ -83,6 +84,10 @@ export function createHttpClient(baseUrl = ""): ApiClient {
 
     async deleteRule(id) {
       await request(`/api/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+
+    ask(input) {
+      return request<AskAnswer>("/api/ask", { method: "POST", body: JSON.stringify(input) });
     },
   };
 }

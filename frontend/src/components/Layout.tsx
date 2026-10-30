@@ -31,6 +31,9 @@ export function Layout() {
             <span>PullWise</span>
           </Link>
           <span className="app-header__tagline">Code review that teaches</span>
+          <Link to="/ask" className="app-header__link">
+            Ask
+          </Link>
           <AuthStatus />
           <ThemeToggle />
         </div>

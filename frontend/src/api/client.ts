@@ -1,4 +1,14 @@
-import type { AuthUser, FindingDetail, Review, ReviewStatusEvent, ReviewSummary, Rule, RuleInput } from "./types";
+import type {
+  AskAnswer,
+  AskInput,
+  AuthUser,
+  FindingDetail,
+  Review,
+  ReviewStatusEvent,
+  ReviewSummary,
+  Rule,
+  RuleInput,
+} from "./types";
 
 /** Error carrying the backend's stable error code (see docs/api.md). */
 export class ApiError extends Error {
@@ -40,4 +50,7 @@ export interface ApiClient {
   createRule(input: RuleInput): Promise<Rule>;
   updateRule(id: string, input: RuleInput): Promise<Rule>;
   deleteRule(id: string): Promise<void>;
+
+  /** Answers a question about a repository (or a review's repository) from its indexed code. */
+  ask(input: AskInput): Promise<AskAnswer>;
 }

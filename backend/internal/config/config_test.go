@@ -18,6 +18,7 @@ func clearEnv(t *testing.T) {
 		"SESSION_SECRET", "FRONTEND_URL", "SECURE_COOKIES",
 		"KNOWLEDGE_URL", "KNOWLEDGE_JWT_SECRET", "KNOWLEDGE_JWT_ISSUER", "KNOWLEDGE_JWT_AUDIENCE",
 		"KNOWLEDGE_TLS_CA_FILE", "KNOWLEDGE_TLS_CERT_FILE", "KNOWLEDGE_TLS_KEY_FILE",
+		"ASK_RATE_PER_MINUTE", "ASK_BURST",
 	} {
 		t.Setenv(key, "")
 	}
@@ -35,6 +36,7 @@ func TestLoadDefaults(t *testing.T) {
 		Addr: ":8080", SkillsDir: "skills", DatabaseURL: "postgres://x",
 		MaxConcurrentReviews: 2, MaxQueuedReviews: 50, ReviewTimeout: 5 * time.Minute,
 		CreateRatePerMinute: 20, CreateBurst: 10,
+		AskRatePerMinute: 10, AskBurst: 5,
 		GitHubOAuthRedirectURL: "http://localhost:8080/auth/github/callback",
 		FrontendURL:            "http://localhost:5173",
 		KnowledgeJWTIssuer:     "pullwise",
@@ -92,6 +94,8 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("SESSION_SECRET", "c2Vzc2lvbi1zZWNyZXQtMzItYnl0ZXMtbG9uZy0h")
 	t.Setenv("FRONTEND_URL", "https://example.com")
 	t.Setenv("SECURE_COOKIES", "true")
+	t.Setenv("ASK_RATE_PER_MINUTE", "3")
+	t.Setenv("ASK_BURST", "2")
 
 	got, err := Load()
 	if err != nil {
@@ -101,6 +105,7 @@ func TestLoadFromEnv(t *testing.T) {
 		Addr: ":9090", SkillsDir: "/opt/skills", DatabaseURL: "postgres://db", GitHubToken: "ghp_x", GroqAPIKey: "gsk_x",
 		MaxConcurrentReviews: 4, MaxQueuedReviews: 8, ReviewTimeout: 90 * time.Second,
 		CreateRatePerMinute: 0, CreateBurst: 3,
+		AskRatePerMinute: 3, AskBurst: 2,
 		GitHubOAuthClientID: "oauth-id", GitHubOAuthClientSecret: "oauth-secret",
 		GitHubOAuthRedirectURL: "https://example.com/callback",
 		SessionSecret:          "c2Vzc2lvbi1zZWNyZXQtMzItYnl0ZXMtbG9uZy0h",

@@ -20,7 +20,7 @@ import (
 
 const (
 	tokenTTL      = time.Minute
-	indexTimeout  = 3 * time.Minute // embedding a repository takes a while
+	indexTimeout  = 6 * time.Minute // a large repo may be paced by the embedding rate limit
 	searchTimeout = 20 * time.Second
 	minSecretLen  = 32
 	maxResponse   = 8 << 20
@@ -97,6 +97,14 @@ func New(baseURL string, secret []byte, issuer, audience string, opts ...Option)
 		opt(c)
 	}
 	return c, nil
+}
+
+// Tenant names whose index a call may touch: a signed-in user's own, or the shared one for anonymous callers.
+func Tenant(viewerID string) string {
+	if viewerID == "" {
+		return "public"
+	}
+	return "u" + viewerID
 }
 
 type requestIDKey struct{}

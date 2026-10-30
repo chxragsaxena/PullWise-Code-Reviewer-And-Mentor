@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net"
@@ -33,25 +34,31 @@ func (a *API) createReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, user := a.viewerContext(r)
-	if user != nil {
-		token, err := a.auth.UserGitHubToken(ctx, user.ID)
-		switch {
-		case err == nil:
-			ctx = github.WithRequestToken(ctx, token)
-		case errors.Is(err, auth.ErrTokenExpired):
-			slog.Info("github token expired; reviewing without it", "user", user.ID)
-		default:
-			slog.Warn("could not load github token; reviewing without it", "user", user.ID, "error", err)
-		}
-	}
-
+	ctx := a.githubContext(r)
 	rv, err := a.svc.Create(ctx, body.PRURL)
 	if err != nil {
 		writeServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, toSummaryDTO(rv))
+}
+
+// githubContext marks the context with the signed-in user and, when usable, their GitHub token.
+func (a *API) githubContext(r *http.Request) context.Context {
+	ctx, user := a.viewerContext(r)
+	if user == nil {
+		return ctx
+	}
+	token, err := a.auth.UserGitHubToken(ctx, user.ID)
+	switch {
+	case err == nil:
+		return github.WithRequestToken(ctx, token)
+	case errors.Is(err, auth.ErrTokenExpired):
+		slog.Info("github token expired; continuing without it", "user", user.ID)
+	default:
+		slog.Warn("could not load github token; continuing without it", "user", user.ID, "error", err)
+	}
+	return ctx
 }
 
 func (a *API) listReviews(w http.ResponseWriter, r *http.Request) {

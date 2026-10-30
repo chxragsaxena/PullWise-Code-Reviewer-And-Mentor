@@ -38,7 +38,7 @@ func (s *Service) relatedCode(ctx context.Context, reviewID string, ref github.P
 		return nil
 	}
 
-	tenant := tenantFor(review.ViewerFrom(ctx))
+	tenant := knowledge.Tenant(review.ViewerFrom(ctx))
 	repo := strings.ToLower(ref.Owner + "/" + ref.Repo)
 	sha := pr.BaseSHA
 	if sha == "" {
@@ -122,12 +122,4 @@ func pickSnippets(found []knowledge.Snippet) []ai.ContextSnippet {
 		}
 	}
 	return out
-}
-
-// tenantFor names whose index a review's knowledge calls use: the user's own, or the shared one.
-func tenantFor(viewerID string) string {
-	if viewerID == "" {
-		return "public"
-	}
-	return "u" + viewerID
 }

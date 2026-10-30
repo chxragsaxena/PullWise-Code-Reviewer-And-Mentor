@@ -89,6 +89,30 @@ describe("Review page", () => {
     }
   });
 
+  it("puts the findings on the left and a chat about the pull request beside them", async () => {
+    const client = fastClient();
+    const review = await reviewWithCritical(client);
+    renderApp(client, `/reviews/${review.id}`);
+
+    const filters = await screen.findByRole("group", { name: "Filter findings by severity" });
+    const chat = screen.getByRole("region", { name: "Ask about the code" });
+    expect(filters.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(chat).getByText(`Pull request #${review.pullRequest.number} in ${review.pullRequest.owner}/${review.pullRequest.repo}`)).toBeInTheDocument();
+    expect(within(chat).getByRole("button", { name: "Summarize what this pull request changes" })).toBeInTheDocument();
+  });
+
+  it("answers a question about the review without leaving the findings", async () => {
+    const client = fastClient();
+    const review = await reviewWithCritical(client);
+    renderApp(client, `/reviews/${review.id}`);
+    await screen.findByRole("group", { name: "Filter findings by severity" });
+
+    await userEvent.type(screen.getByLabelText("Your question"), "Is this safe?{Enter}");
+
+    expect(await screen.findByText(/Demo mode: this answer is simulated/)).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Filter findings by severity" })).toBeInTheDocument();
+  });
+
   it("says when the review does not exist", async () => {
     renderApp(fastClient(), "/reviews/nope");
     expect(await screen.findByText("Review not found")).toBeInTheDocument();

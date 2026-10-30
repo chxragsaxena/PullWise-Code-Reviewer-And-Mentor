@@ -105,6 +105,42 @@ export type RuleInput = Omit<Rule, "id">;
 /** Limits enforced by the backend. */
 export const RULE_LIMITS = { maxRules: 20, maxTitle: 120, maxInstructions: 1000 } as const;
 
+/** One earlier message of a conversation. */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** A piece of code an answer cites. */
+export interface AskSource {
+  n: number;
+  path: string;
+  startLine: number;
+  endLine: number;
+  /** Link to those lines on GitHub. */
+  url: string;
+  snippet: string;
+}
+
+export interface AskInput {
+  /** "owner/name"; omit when reviewId is given. */
+  repo?: string;
+  /** Ask about this review's repository and findings. */
+  reviewId?: string;
+  question: string;
+  history: ChatTurn[];
+}
+
+export interface AskAnswer {
+  answer: string;
+  repo: string;
+  indexedRef: string;
+  sources: AskSource[];
+}
+
+/** Limits enforced by the backend for questions. */
+export const ASK_LIMITS = { maxQuestion: 1000, maxHistory: 6 } as const;
+
 /** The signed-in GitHub user, from GET /auth/me. */
 export interface AuthUser {
   id: string;

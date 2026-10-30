@@ -138,6 +138,40 @@ func TestRepositoryFilesRejectsANonArchive(t *testing.T) {
 	}
 }
 
+func TestDefaultBranchSHAReadsABareCommitID(t *testing.T) {
+	const sha = "9f8adb1aabaa8a91180a821111d3f8e668d1c0bf"
+	var gotPath, gotAccept string
+	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotAccept = r.URL.Path, r.Header.Get("Accept")
+		fmt.Fprint(w, sha+"\n")
+	}))
+
+	got, err := c.DefaultBranchSHA(context.Background(), PullRequestRef{Owner: "o", Repo: "r"})
+	if err != nil || got != sha {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if gotPath != "/repos/o/r/commits/HEAD" || gotAccept != "application/vnd.github.sha" {
+		t.Errorf("path = %q, accept = %q", gotPath, gotAccept)
+	}
+}
+
+func TestDefaultBranchSHAErrors(t *testing.T) {
+	missing := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+	}))
+	if _, err := missing.DefaultBranchSHA(context.Background(), testRef); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing repo: %v, want ErrNotFound", err)
+	}
+
+	odd := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "<html>not a sha</html>")
+	}))
+	if _, err := odd.DefaultBranchSHA(context.Background(), testRef); err == nil {
+		t.Error("a response that is not a commit id must be an error")
+	}
+}
+
 func TestFetchPullRequestReadsTheBaseCommit(t *testing.T) {
 	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"title":"t","head":{"sha":"headsha"},"base":{"sha":"basesha"}}`)

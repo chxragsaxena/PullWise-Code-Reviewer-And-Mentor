@@ -46,6 +46,10 @@ type Config struct {
 
 	CreateRatePerMinute int
 	CreateBurst         int
+
+	// AskRatePerMinute and AskBurst limit POST /api/ask per client; a rate of 0 turns the limit off.
+	AskRatePerMinute int
+	AskBurst         int
 }
 
 func Load() (Config, error) {
@@ -89,6 +93,8 @@ func Load() (Config, error) {
 	c.MaxQueuedReviews = intEnv("MAX_QUEUED_REVIEWS", 50, 1, &errs)
 	c.CreateRatePerMinute = intEnv("CREATE_RATE_PER_MINUTE", 20, 0, &errs)
 	c.CreateBurst = intEnv("CREATE_BURST", 10, 1, &errs)
+	c.AskRatePerMinute = intEnv("ASK_RATE_PER_MINUTE", 10, 0, &errs)
+	c.AskBurst = intEnv("ASK_BURST", 5, 1, &errs)
 	c.ReviewTimeout = durationEnv("REVIEW_TIMEOUT", 5*time.Minute, &errs)
 
 	return c, errors.Join(errs...)

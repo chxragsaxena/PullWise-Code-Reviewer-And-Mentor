@@ -39,6 +39,17 @@ type ReviewInput struct {
 	Context []ContextSnippet
 }
 
+// Message is one turn of a chat; Role is "user" or "assistant".
+type Message struct {
+	Role    string
+	Content string
+}
+
+// Chatter answers free-form questions with plain text (no structured output).
+type Chatter interface {
+	Chat(ctx context.Context, system string, messages []Message) (string, error)
+}
+
 // Provider evaluates a skill's AI checks against a set of changed files.
 type Provider interface {
 	Review(ctx context.Context, input ReviewInput) ([]Finding, error)

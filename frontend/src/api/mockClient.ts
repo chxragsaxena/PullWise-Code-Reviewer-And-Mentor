@@ -260,6 +260,28 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
       });
     },
 
+    ask(input) {
+      return respond(() => {
+        if (!input.question.trim()) throw new ApiError("invalid_request", "Ask a question.", 400);
+        const repo = input.repo ?? "acme/orders-service";
+        return {
+          answer: `Demo mode: this answer is simulated. With the real backend, PullWise searches ${repo} and cites the code it used [1].`,
+          repo,
+          indexedRef: "0000000",
+          sources: [
+            {
+              n: 1,
+              path: "internal/orders/service.go",
+              startLine: 12,
+              endLine: 40,
+              url: `https://github.com/${repo}`,
+              snippet: "func (s *Service) Create(ctx context.Context, o Order) error {\n\t// ...\n}",
+            },
+          ],
+        };
+      });
+    },
+
     deleteRule(id) {
       return respond(() => {
         signedIn();

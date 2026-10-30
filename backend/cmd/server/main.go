@@ -16,6 +16,7 @@ import (
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/tsast"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ask"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/auth"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/config"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/github"
@@ -119,7 +120,8 @@ func run() error {
 		slog.Warn("KNOWLEDGE_URL is not set: the AI pass will not see code beyond the diff")
 	}
 
-	svc := service.New(st, st, github.NewClient(opts...), service.Config{
+	ghClient := github.NewClient(opts...)
+	svc := service.New(st, st, ghClient, service.Config{
 		Skills:        loadedSkills,
 		Analyzers:     analyzers,
 		AIProvider:    aiProvider,
@@ -129,8 +131,18 @@ func run() error {
 		ReviewTimeout: cfg.ReviewTimeout,
 	})
 
+	// Questions need both the knowledge base and a chat-capable AI; otherwise the endpoint reports "unavailable".
+	chatter, _ := aiProvider.(ai.Chatter)
+	askPrompt, err := ai.LoadAskPrompt(os.DirFS(cfg.SkillsDir))
+	if err != nil {
+		return fmt.Errorf("load ask prompt: %w", err)
+	}
+	askSvc := ask.New(ask.Config{Knowledge: kb, Repos: ghClient, Reviews: svc, Chat: chatter, Prompt: askPrompt})
+
 	apiOpts := []httpapi.Option{
 		httpapi.WithRules(rules.NewService(st)),
+		httpapi.WithAsk(askSvc),
+		httpapi.WithAskRateLimit(cfg.AskRatePerMinute, cfg.AskBurst),
 		httpapi.WithReadiness(db.PingContext),
 		httpapi.WithCreateRateLimit(cfg.CreateRatePerMinute, cfg.CreateBurst),
 	}

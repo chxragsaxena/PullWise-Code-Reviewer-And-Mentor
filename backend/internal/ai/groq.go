@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -60,10 +62,10 @@ func NewGroqProvider(apiKey string, opts ...GroqOption) *GroqProvider {
 }
 
 type groqRequest struct {
-	Model          string             `json:"model"`
-	Messages       []groqMessage      `json:"messages"`
-	MaxTokens      int                `json:"max_tokens"`
-	ResponseFormat groqResponseFormat `json:"response_format"`
+	Model          string              `json:"model"`
+	Messages       []groqMessage       `json:"messages"`
+	MaxTokens      int                 `json:"max_tokens"`
+	ResponseFormat *groqResponseFormat `json:"response_format,omitempty"`
 }
 
 type groqMessage struct {
@@ -108,6 +110,36 @@ func (e *GroqAPIError) Error() string {
 	return fmt.Sprintf("groq: %d %s: %s", e.StatusCode, e.Type, e.Message)
 }
 
+// chatMaxTokens bounds one chat answer.
+const chatMaxTokens = 1200
+
+// Chat answers a conversation as plain text; the system prompt comes from the caller.
+func (p *GroqProvider) Chat(ctx context.Context, system string, messages []Message) (string, error) {
+	msgs := make([]groqMessage, 0, len(messages)+1)
+	msgs = append(msgs, groqMessage{Role: "system", Content: system})
+	for _, m := range messages {
+		msgs = append(msgs, groqMessage{Role: m.Role, Content: m.Content})
+	}
+
+	resp, err := p.do(ctx, groqRequest{Model: p.model, Messages: msgs, MaxTokens: chatMaxTokens})
+	if err != nil {
+		return "", fmt.Errorf("groq chat: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return "", errors.New("groq chat: response had no choices")
+	}
+	choice := resp.Choices[0]
+	// "length" means the answer hit the token cap; a cut-off answer is still useful.
+	if choice.FinishReason != "stop" && choice.FinishReason != "length" {
+		return "", fmt.Errorf("groq chat: unexpected finish_reason %q", choice.FinishReason)
+	}
+	text := strings.TrimSpace(choice.Message.Content)
+	if text == "" {
+		return "", errors.New("groq chat: the answer was empty")
+	}
+	return text, nil
+}
+
 func (p *GroqProvider) Review(ctx context.Context, input ReviewInput) ([]Finding, error) {
 	if len(input.Checks) == 0 {
 		return nil, nil
@@ -120,7 +152,7 @@ func (p *GroqProvider) Review(ctx context.Context, input ReviewInput) ([]Finding
 			{Role: "user", Content: buildPrompt(input)},
 		},
 		MaxTokens: maxTokens,
-		ResponseFormat: groqResponseFormat{
+		ResponseFormat: &groqResponseFormat{
 			Type: "json_schema",
 			JSONSchema: groqJSONSchema{
 				Name:   reportToolName,

@@ -5,7 +5,7 @@ import { ApiError } from "../api/client";
 import { EmptyState, ErrorState, LoadingState } from "../components/PageState";
 import { PrSummary } from "../components/PrSummary";
 import { ProgressView } from "../components/ProgressView";
-import { ReviewResults } from "../components/ReviewResults";
+import { ReviewWorkspace } from "../components/ReviewWorkspace";
 import { useAsync } from "../hooks/useAsync";
 import { useReviewProgress } from "../hooks/useReviewProgress";
 import { isTerminal } from "../lib/status";
@@ -56,7 +56,7 @@ export function ReviewPage() {
     );
   }
 
-  if (data.status === "completed") return <ReviewResults review={data} />;
+  if (data.status === "completed") return <ReviewWorkspace review={data} />;
 
   return (
     <>
