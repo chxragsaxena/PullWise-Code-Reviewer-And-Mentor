@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -60,8 +61,9 @@ func TestIndexSendsASignedTokenForTheTenantAndTheFiles(t *testing.T) {
 	var claims map[string]any
 	var body struct {
 		Repo, Ref string
-		Files     []File
+		Files     []struct{ Path, ContentBase64, Content string }
 	}
+	var rawBody string
 	var requestID string
 	c := newClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/index" || r.Method != http.MethodPost {
@@ -69,12 +71,14 @@ func TestIndexSendsASignedTokenForTheTenantAndTheFiles(t *testing.T) {
 		}
 		claims = decodeToken(t, r.Header.Get("Authorization"))
 		requestID = r.Header.Get("X-Request-ID")
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		raw, _ := io.ReadAll(r.Body)
+		rawBody = string(raw)
+		_ = json.Unmarshal(raw, &body)
 		fmt.Fprint(w, `{"status":"indexed","files":1,"chunks":2}`)
 	})
 
 	ctx := WithRequestID(context.Background(), "review-7")
-	got, err := c.Index(ctx, "u42", "o/r", "abc", []File{{Path: "a.go", Content: "package a"}})
+	got, err := c.Index(ctx, "u42", "o/r", "abc", []File{{Path: "a.go", Content: "curl -v http://localhost <example>/main.go"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,6 +102,13 @@ func TestIndexSendsASignedTokenForTheTenantAndTheFiles(t *testing.T) {
 	}
 	if body.Repo != "o/r" || body.Ref != "abc" || len(body.Files) != 1 || body.Files[0].Path != "a.go" {
 		t.Errorf("body = %+v", body)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(body.Files[0].ContentBase64)
+	if err != nil || string(decoded) != "curl -v http://localhost <example>/main.go" {
+		t.Errorf("contentBase64 decodes to %q, %v", decoded, err)
+	}
+	if body.Files[0].Content != "" || strings.Contains(rawBody, "curl") || strings.Contains(rawBody, "<example>") {
+		t.Errorf("file text must not travel in the clear (firewalls block it): %s", rawBody)
 	}
 }
 

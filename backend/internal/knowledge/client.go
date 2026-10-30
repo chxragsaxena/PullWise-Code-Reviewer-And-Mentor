@@ -32,6 +32,21 @@ type File struct {
 	Content string `json:"content"`
 }
 
+// wireFile is a File as sent: base64, because web firewalls in front of the service misread plain
+// source and docs (shell commands, HTML-like placeholders) as attacks and block the whole request.
+type wireFile struct {
+	Path          string `json:"path"`
+	ContentBase64 string `json:"contentBase64"`
+}
+
+func encodeFiles(files []File) []wireFile {
+	out := make([]wireFile, len(files))
+	for i, f := range files {
+		out[i] = wireFile{Path: f.Path, ContentBase64: base64.StdEncoding.EncodeToString([]byte(f.Content))}
+	}
+	return out
+}
+
 // Snippet is a piece of related code the service found.
 type Snippet struct {
 	Path      string  `json:"path"`
@@ -118,7 +133,7 @@ func (c *Client) Index(ctx context.Context, tenant, repo, ref string, files []Fi
 	ctx, cancel := context.WithTimeout(ctx, indexTimeout)
 	defer cancel()
 	var out IndexResult
-	body := map[string]any{"repo": repo, "ref": ref, "files": files}
+	body := map[string]any{"repo": repo, "ref": ref, "files": encodeFiles(files)}
 	err := c.do(ctx, http.MethodPost, "/v1/index", tenant, []string{"index"}, body, &out)
 	return out, err
 }
