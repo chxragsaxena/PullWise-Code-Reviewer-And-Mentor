@@ -15,6 +15,7 @@ import (
 
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ai"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/goast"
+	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/pyast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/analyzer/tsast"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/ask"
 	"github.com/chxragsaxena/PullWise-Code-Reviewer-And-Mentor/internal/auth"
@@ -94,6 +95,7 @@ func run() error {
 	analyzers := []review.StaticAnalyzer{
 		goast.New(goast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "go")}),
 		tsast.New(tsast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "typescript")}),
+		pyast.New(pyast.Config{ComplexityThreshold: complexityThreshold(loadedSkills, "python")}),
 	}
 
 	systemPrompt, err := ai.LoadSystemPrompt(os.DirFS(cfg.SkillsDir))

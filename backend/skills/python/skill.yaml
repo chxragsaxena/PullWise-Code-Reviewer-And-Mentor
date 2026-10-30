@@ -1,0 +1,63 @@
+id: python
+name: Python
+version: 1
+languages: [python]
+description: >
+  Python-specific correctness: exception handling, shared default values,
+  network timeouts, resource cleanup and SQL safety. Exact checks use
+  tree-sitter (see internal/analyzer/pyast); the rest are judged by the AI pass.
+
+checks:
+  - id: bare-except
+    title: "`except:` with no exception type"
+    kind: deterministic
+    analyzer: pyast
+    severity: high
+    lesson: exception-handling
+
+  - id: swallowed-exception
+    title: An except block that does nothing
+    kind: deterministic
+    analyzer: pyast
+    severity: medium
+    lesson: exception-handling
+
+  - id: mutable-default-argument
+    title: Mutable value used as a default argument
+    kind: deterministic
+    analyzer: pyast
+    severity: high
+    lesson: mutable-defaults
+
+  - id: request-without-timeout
+    title: requests call has no timeout
+    kind: deterministic
+    analyzer: pyast
+    severity: medium
+    lesson: request-timeouts
+
+  - id: high-complexity
+    title: Function has high cyclomatic complexity
+    kind: deterministic
+    analyzer: pyast
+    threshold: 15
+    severity: medium
+    lesson: high-complexity
+
+  - id: blocking-call-in-async
+    title: Blocking call inside an async function
+    kind: ai
+    severity: high
+    lesson: blocking-in-async
+
+  - id: unclosed-resource
+    title: File, connection or lock not closed on every path
+    kind: ai
+    severity: medium
+    lesson: resource-cleanup
+
+  - id: sql-built-from-strings
+    title: SQL query built by formatting strings
+    kind: ai
+    severity: high
+    lesson: sql-injection

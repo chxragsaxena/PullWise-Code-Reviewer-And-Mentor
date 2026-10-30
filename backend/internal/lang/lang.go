@@ -7,6 +7,7 @@ import "path"
 const (
 	Go         = "go"
 	TypeScript = "typescript"
+	Python     = "python"
 )
 
 // byExtension covers source code only; data and markup are not reviewed.
@@ -21,7 +22,7 @@ var byExtension = map[string]string{
 	".jsx":   "javascript",
 	".mjs":   "javascript",
 	".cjs":   "javascript",
-	".py":    "python",
+	".py":    Python,
 	".java":  "java",
 	".kt":    "kotlin",
 	".scala": "scala",

@@ -11,7 +11,7 @@ private to you.
 ## What makes it different
 
 - **Facts are separated from judgment.** Deterministic analyzers (Go via `go/ast`,
-  TypeScript via tree-sitter) only report *what they observed*. Severity, confidence,
+  TypeScript and Python via tree-sitter) only report *what they observed*. Severity, confidence,
   titles and lessons always come from versioned skill files, never from the analyzer
   or the model. Findings that don't match a defined check are dropped.
 - **Skills are files.** A skill is a `skill.yaml` (what to check) plus `lessons/*.md`
@@ -87,7 +87,7 @@ is [docs/api.md](docs/api.md); progress and decisions are in
   missing one).
 - **Database:** PostgreSQL with embedded migrations applied at startup under an
   advisory lock; review completion is one transaction.
-- **Languages:** deterministic checks for Go and TypeScript; the design skills
+- **Languages:** deterministic checks for Go, TypeScript and Python (Python also has AI-judged checks for blocking calls in async code, unclosed resources and SQL built from strings); the design skills
   (SOLID, REST) are AI-reviewed and apply to any recognised source language.
 - **Tests:** table-driven unit tests, integration tests against real PostgreSQL, fake
   HTTP servers for every external API, and a frontend suite (Vitest + Testing
@@ -149,7 +149,7 @@ cd frontend && npm test
 
 | | |
 |---|---|
-| Public-PR review, dashboard, Go + TypeScript analyzers, AI pass | Done |
+| Public-PR review, dashboard, Go, TypeScript and Python analyzers, AI pass | Done |
 | GitHub sign-in, private-repo reviews, private-by-owner results | Done |
 | Repository knowledge base (retrieval over the repo with pgvector), as a separate service with signed-token auth and optional mutual TLS | Done and verified end to end. Retrieval is measured (below); how much it improves review quality is not |
 | Your own review standards (per-user rules, snapshot per review) | Done and verified live |
@@ -176,5 +176,5 @@ Questions about code are still missed sometimes (for example, "How are GitHub OA
 encrypted?" never returned `crypto.go`).
 
 Known limits: AI findings are less reliable than the parser-based ones (they carry the
-model's own confidence); only Go and TypeScript have exact checks; sharing a private
+model's own confidence); only Go, TypeScript and Python have exact checks, and every analyzer reads the whole changed file, not just the changed lines; sharing a private
 review with another person is not built.

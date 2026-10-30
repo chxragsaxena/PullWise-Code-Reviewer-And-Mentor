@@ -36,6 +36,8 @@ const (
 	AnalyzerGoAST Analyzer = "goast"
 	// AnalyzerTSAST is internal/analyzer/tsast, tree-sitter based, for TypeScript.
 	AnalyzerTSAST Analyzer = "tsast"
+	// AnalyzerPyAST is internal/analyzer/pyast, tree-sitter based, for Python.
+	AnalyzerPyAST Analyzer = "pyast"
 )
 
 // Check is one thing a skill looks for.
@@ -199,7 +201,7 @@ func (s Skill) validateCheck(c Check) error {
 	switch c.Kind {
 	case KindDeterministic:
 		switch c.Analyzer {
-		case AnalyzerSemgrep, AnalyzerTreeSitter, AnalyzerGoAST, AnalyzerTSAST:
+		case AnalyzerSemgrep, AnalyzerTreeSitter, AnalyzerGoAST, AnalyzerTSAST, AnalyzerPyAST:
 		case AnalyzerMetric:
 			if c.Threshold < 1 {
 				return errors.New("metric checks need a threshold")
