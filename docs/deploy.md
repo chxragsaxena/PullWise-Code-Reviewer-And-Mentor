@@ -36,8 +36,8 @@ $b = New-Object byte[] 36; [Security.Cryptography.RandomNumberGenerator]::Create
    - `pullwise-knowledge`: `COHERE_API_KEY` and `JWT_SECRET` (**the same value** as the backend's `KNOWLEDGE_JWT_SECRET`).
 3. Wait for both services to show **Live**. Check `https://<backend>.onrender.com/healthz` and
    `https://<knowledge>.onrender.com/healthz`.
-4. If Render gave the backend a different address than `pullwise-backend.onrender.com` (the name was taken),
-   edit the two `destination` lines in `frontend/vercel.json` and push.
+4. If Render gave the backend a different address than `pullwise-backend.onrender.com` (Render names the service after the repository unless you rename it),
+   edit the two `destination` lines (they currently point at `pullwise-code-reviewer-and-mentor.onrender.com`) in `frontend/vercel.json` and push.
 
 ## 3. Vercel
 
