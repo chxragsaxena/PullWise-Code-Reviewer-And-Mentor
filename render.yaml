@@ -1,0 +1,68 @@
+# Render Blueprint: the database, the PullWise backend and the knowledge service.
+# Values marked sync: false are asked for in the Render dashboard; see docs/deploy.md.
+
+databases:
+  - name: pullwise-db
+    databaseName: pullwise
+    user: pullwise
+    plan: free
+
+services:
+  - type: web
+    name: pullwise-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /healthz
+    envVars:
+      - key: ADDR
+        value: ":10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pullwise-db
+          property: connectionString
+      - key: SECURE_COOKIES
+        value: "true"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      # The public address of the Vercel site (it proxies /api and /auth to this service).
+      - key: FRONTEND_URL
+        sync: false
+      - key: GITHUB_OAUTH_REDIRECT_URL
+        sync: false
+      - key: KNOWLEDGE_URL
+        sync: false
+      - key: KNOWLEDGE_JWT_SECRET
+        sync: false
+
+  - type: web
+    name: pullwise-knowledge
+    runtime: docker
+    plan: free
+    repo: https://github.com/chxragsaxena/pullwise-knowledge
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: ADDR
+        value: ":10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pullwise-db
+          property: connectionString
+      # Its own schema, because PullWise already uses this database's public schema.
+      - key: DATABASE_SCHEMA
+        value: knowledge
+      - key: COHERE_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false

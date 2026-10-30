@@ -136,7 +136,7 @@ than breaking the app.
 | `PUBLIC_URL`, `SECURE_COOKIES` | Set when deploying behind a real domain (use `https`) |
 | `KNOWLEDGE_URL`, `KNOWLEDGE_JWT_SECRET` | Turns on the repository knowledge base (the separate service); the secret must match the service's `JWT_SECRET`. Optional `KNOWLEDGE_TLS_*` files enable mutual TLS. This also turns on Ask; `ASK_RATE_PER_MINUTE` / `ASK_BURST` limit it |
 
-See [.env.example](.env.example) for the full list.
+See [.env.example](.env.example) for the full list. To deploy on Render and Vercel, see [docs/deploy.md](docs/deploy.md).
 
 ## Tests
 
