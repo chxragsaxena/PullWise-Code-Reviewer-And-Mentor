@@ -1,6 +1,7 @@
 import { Link, Outlet } from "react-router-dom";
 import { AuthStatus } from "./AuthStatus";
 import { ThemeToggle } from "./ThemeToggle";
+import { WakingBanner } from "./WakingBanner";
 import "./Layout.css";
 
 function BrandMark() {
@@ -38,6 +39,7 @@ export function Layout() {
           <ThemeToggle />
         </div>
       </header>
+      <WakingBanner />
       <main id="main" className="container app-main">
         <Outlet />
       </main>

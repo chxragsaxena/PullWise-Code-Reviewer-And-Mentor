@@ -10,23 +10,58 @@ import {
   type Rule,
 } from "./types";
 import { isTerminal } from "../lib/status";
+import { beginWaking } from "./waking";
+
+/** Waits between retries while a sleeping server wakes up: about a minute in all. */
+export const WAKE_RETRY_DELAYS_MS = [2000, 4000, 6000, 8000, 10000, 12000, 15000];
+
+/** Network failures are retried less: offline is more likely than a cold start. */
+const MAX_NETWORK_RETRIES = 2;
+
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
+export interface HttpClientOptions {
+  retryDelaysMs?: number[];
+}
 
 /** Talks to the Go backend described in docs/api.md. */
-export function createHttpClient(baseUrl = ""): ApiClient {
+export function createHttpClient(baseUrl = "", { retryDelaysMs = WAKE_RETRY_DELAYS_MS }: HttpClientOptions = {}): ApiClient {
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
 
-    let response: Response;
+    let stopWaiting: (() => void) | null = null;
     try {
-      // Same-origin in dev (Vite proxy) and prod, so the session cookie needs no CORS handling.
-      response = await fetch(`${baseUrl}${path}`, { ...init, headers, credentials: "same-origin" });
-    } catch {
-      throw new ApiError("network_error", "Could not reach the server. Check your connection and try again.", 0);
+      for (let attempt = 0; ; attempt++) {
+        let response: Response | null = null;
+        try {
+          // Same-origin in dev (Vite proxy) and prod, so the session cookie needs no CORS handling.
+          response = await fetch(`${baseUrl}${path}`, { ...init, headers, credentials: "same-origin" });
+        } catch {
+          if (attempt >= Math.min(MAX_NETWORK_RETRIES, retryDelaysMs.length)) {
+            throw new ApiError("network_error", "Could not reach the server. Check your connection and try again.", 0);
+          }
+        }
+
+        if (response?.ok) {
+          if (response.status === 204) return undefined as T;
+          return (await response.json()) as T;
+        }
+        if (response && !(await isGatewayFailure(response))) throw await toApiError(response);
+        if (attempt >= retryDelaysMs.length) {
+          throw new ApiError(
+            "server_unavailable",
+            "The server is not responding. It may still be waking up, so please try again in a minute.",
+            response?.status ?? 0,
+          );
+        }
+
+        stopWaiting ??= beginWaking();
+        await sleep(retryDelaysMs[attempt] ?? 0);
+      }
+    } finally {
+      stopWaiting?.();
     }
-    if (!response.ok) throw await toApiError(response);
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
   }
 
   return {
@@ -90,6 +125,22 @@ export function createHttpClient(baseUrl = ""): ApiClient {
       return request<AskAnswer>("/api/ask", { method: "POST", body: JSON.stringify(input) });
     },
   };
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A gateway status without our JSON error body came from the proxy in front of a sleeping or restarting
+ * server. The backend's own 502/503/504 errors carry a body and are real answers, so they are not retried.
+ */
+async function isGatewayFailure(response: Response): Promise<boolean> {
+  if (!GATEWAY_STATUSES.has(response.status)) return false;
+  try {
+    const body = (await response.clone().json()) as { error?: { code?: string } };
+    return !body.error?.code;
+  } catch {
+    return true;
+  }
 }
 
 async function toApiError(response: Response): Promise<ApiError> {

@@ -1,0 +1,8 @@
+.waking {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: center;
+}
