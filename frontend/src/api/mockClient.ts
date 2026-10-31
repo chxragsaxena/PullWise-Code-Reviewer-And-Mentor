@@ -63,6 +63,7 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
   const store = new Map<string, StoredReview>();
   let nextId = 1;
   let currentUser: AuthUser | null = null;
+  let askedRepos: string[] = []; // most recent first
   let rules: Rule[] = [];
   let nextRuleId = 1;
 
@@ -225,6 +226,7 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
     logout() {
       return respond(() => {
         currentUser = null;
+        askedRepos = [];
         rules = [];
       });
     },
@@ -264,6 +266,7 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
       return respond(() => {
         if (!input.question.trim()) throw new ApiError("invalid_request", "Ask a question.", 400);
         const repo = input.repo ?? "acme/orders-service";
+        if (currentUser) askedRepos = [repo.toLowerCase(), ...askedRepos.filter((r) => r !== repo.toLowerCase())];
         return {
           answer: `Demo mode: this answer is simulated. With the real backend, PullWise searches ${repo} and cites the code it used [1].`,
           repo,
@@ -279,6 +282,16 @@ export function createMockClient({ latencyMs = 250, stepDelayMs = 900 }: MockCli
             },
           ],
         };
+      });
+    },
+
+    listRecentRepos() {
+      return respond(() => {
+        if (!currentUser) return [];
+        const reviewed = [...store.values()]
+          .sort((a, b) => b.review.createdAt.localeCompare(a.review.createdAt))
+          .map((s) => `${s.review.pullRequest.owner}/${s.review.pullRequest.repo}`.toLowerCase());
+        return [...new Set([...askedRepos, ...reviewed])];
       });
     },
 

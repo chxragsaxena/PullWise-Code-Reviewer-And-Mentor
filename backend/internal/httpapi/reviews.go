@@ -40,6 +40,7 @@ func (a *API) createReview(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
+	a.rememberRepo(ctx, rv.PullRequest.Owner+"/"+rv.PullRequest.Repo)
 	writeJSON(w, http.StatusAccepted, toSummaryDTO(rv))
 }
 

@@ -5,6 +5,7 @@ import { PrForm } from "../components/PrForm";
 import { ReviewList } from "../components/ReviewList";
 import { TryExamples, type Example } from "../components/TryExamples";
 import { useAsync } from "../hooks/useAsync";
+import { useRecentRepos } from "../hooks/useRecentRepos";
 import "./HomePage.css";
 
 /** Real, merged pull requests; the id is the link, so picking one starts a review of it. */
@@ -30,6 +31,7 @@ export function HomePage() {
   const api = useApi();
   const navigate = useNavigate();
   const recent = useAsync(() => api.listReviews(), [api]);
+  const myRepos = useRecentRepos();
 
   async function startReview(prUrl: string) {
     const review = await api.createReview(prUrl);
@@ -44,7 +46,7 @@ export function HomePage() {
           Paste a GitHub pull request, or try a real one below. PullWise checks it against engineering standards and explains each problem it
           finds, with the evidence and a short lesson.
         </p>
-        <PrForm onSubmit={startReview} />
+        <PrForm onSubmit={startReview} repos={myRepos} />
         <TryExamples heading="No pull request handy? Try a real one:" examples={EXAMPLE_PRS} onPick={startReview} />
         {api.kind === "mock" && (
           <p className="hero__hint">

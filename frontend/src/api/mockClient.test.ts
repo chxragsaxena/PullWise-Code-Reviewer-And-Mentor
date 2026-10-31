@@ -21,6 +21,43 @@ function collectUntilTerminal(client: ReturnType<typeof fast>, id: string): Prom
   });
 }
 
+describe("mock API client: recent repositories", () => {
+  it("has none for someone signed out", async () => {
+    await expect(fast().listRecentRepos()).resolves.toEqual([]);
+  });
+
+  it("lists the signed-in user's repositories newest first, without repeats", async () => {
+    const client = fast();
+    await client.login();
+    await client.ask({ repo: "Go-Chi/Chi", question: "q", history: [] });
+    await client.ask({ repo: "acme/shop", question: "q", history: [] });
+    await client.ask({ repo: "go-chi/chi", question: "q again", history: [] });
+
+    const repos = await client.listRecentRepos();
+
+    expect(repos.slice(0, 2)).toEqual(["go-chi/chi", "acme/shop"]);
+    expect(repos).toContain("golang/example"); // a seeded review
+    expect(new Set(repos).size).toBe(repos.length);
+  });
+
+  it("includes the repository of a review started this session", async () => {
+    const client = fast();
+    await client.login();
+    await client.createReview("https://github.com/Zod/Zod/pull/5");
+
+    expect((await client.listRecentRepos())[0]).toBe("zod/zod");
+  });
+
+  it("forgets everything on sign-out", async () => {
+    const client = fast();
+    await client.login();
+    await client.ask({ repo: "acme/shop", question: "q", history: [] });
+    await client.logout();
+
+    await expect(client.listRecentRepos()).resolves.toEqual([]);
+  });
+});
+
 describe("mock API client", () => {
   it("rejects an invalid PR link with the documented error code", async () => {
     const error = await fast()

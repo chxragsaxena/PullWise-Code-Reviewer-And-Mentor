@@ -39,7 +39,7 @@ export function TryExamples({ heading, examples, onPick }: TryExamplesProps) {
           <li key={example.id}>
             <button type="button" className="try__item" disabled={busy !== null} onClick={() => pick(example.id)}>
               <span className="try__title">{busy === example.id ? "Starting…" : example.title}</span>
-              <span className="try__detail">{example.detail}</span>
+              {example.detail && <span className="try__detail">{example.detail}</span>}
             </button>
           </li>
         ))}

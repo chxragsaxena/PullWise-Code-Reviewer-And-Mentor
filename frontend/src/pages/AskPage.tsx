@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChatPanel } from "../components/ChatPanel";
 import { TryExamples, type Example } from "../components/TryExamples";
+import { useRecentRepos } from "../hooks/useRecentRepos";
 import { parseRepoRef, repoName } from "../lib/repoRef";
 import "./AskPage.css";
 
@@ -19,6 +20,8 @@ const SUGGESTIONS = [
 
 export function AskPage() {
   const inputId = useId();
+  const listId = useId();
+  const myRepos = useRecentRepos();
   const [params, setParams] = useSearchParams();
   const selected = parseRepoRef(params.get("repo") ?? "");
   const [value, setValue] = useState("");
@@ -73,7 +76,15 @@ export function AskPage() {
             spellCheck={false}
             onChange={(e) => setValue(e.target.value)}
             aria-invalid={error !== null}
+            list={myRepos.length > 0 ? listId : undefined}
           />
+          {myRepos.length > 0 && (
+            <datalist id={listId}>
+              {myRepos.map((repo) => (
+                <option key={repo} value={repo} />
+              ))}
+            </datalist>
+          )}
           <button type="submit" className="button">
             Start asking
           </button>
@@ -84,6 +95,13 @@ export function AskPage() {
           </p>
         )}
       </form>
+      {myRepos.length > 0 && (
+        <TryExamples
+          heading="Your recent repositories:"
+          examples={myRepos.slice(0, 6).map((repo) => ({ id: repo, title: repo, detail: "" }))}
+          onPick={(repo) => setParams({ repo })}
+        />
+      )}
       <TryExamples
         heading="Not sure which repository? Try one:"
         examples={EXAMPLE_REPOS}

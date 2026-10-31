@@ -81,11 +81,13 @@ func (a *API) askQuestion(w http.ResponseWriter, r *http.Request) {
 		req.History = append(req.History, ask.Turn{Role: t.Role, Content: t.Content})
 	}
 
-	got, err := a.ask.Ask(a.githubContext(r), req)
+	ctx := a.githubContext(r)
+	got, err := a.ask.Ask(ctx, req)
 	if err != nil {
 		writeAskError(w, r, err)
 		return
 	}
+	a.rememberRepo(ctx, got.Repo)
 
 	sources := make([]sourceDTO, 0, len(got.Sources))
 	for _, s := range got.Sources {

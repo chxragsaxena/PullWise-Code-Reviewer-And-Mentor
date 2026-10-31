@@ -144,6 +144,7 @@ func run() error {
 
 	apiOpts := []httpapi.Option{
 		httpapi.WithRules(rules.NewService(st)),
+		httpapi.WithRepoHistory(st),
 		httpapi.WithAsk(askSvc),
 		httpapi.WithAskRateLimit(cfg.AskRatePerMinute, cfg.AskBurst),
 		httpapi.WithReadiness(db.PingContext),

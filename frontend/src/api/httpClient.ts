@@ -124,6 +124,11 @@ export function createHttpClient(baseUrl = "", { retryDelaysMs = WAKE_RETRY_DELA
     ask(input) {
       return request<AskAnswer>("/api/ask", { method: "POST", body: JSON.stringify(input) });
     },
+
+    async listRecentRepos() {
+      const body = await request<{ repos: string[] }>("/api/repos/recent");
+      return body.repos;
+    },
   };
 }
 

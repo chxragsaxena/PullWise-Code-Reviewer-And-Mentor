@@ -53,4 +53,7 @@ export interface ApiClient {
 
   /** Answers a question about a repository (or a review's repository) from its indexed code. */
   ask(input: AskInput): Promise<AskAnswer>;
+
+  /** Repositories the signed-in user used before ("owner/name", newest first); empty when signed out. */
+  listRecentRepos(): Promise<string[]>;
 }

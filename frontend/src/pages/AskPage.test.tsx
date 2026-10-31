@@ -50,6 +50,30 @@ describe("Ask page", () => {
     expect(screen.getByLabelText("Your question")).toBeInTheDocument();
   });
 
+  it("suggests the repositories a signed-in user used before", async () => {
+    const client = createMockClient({ latencyMs: 0, stepDelayMs: 1 });
+    await client.login();
+    await client.ask({ repo: "acme/shop", question: "q", history: [] });
+    render(
+      <ApiProvider client={client}>
+        <MemoryRouter initialEntries={["/ask"]}>
+          <App />
+        </MemoryRouter>
+      </ApiProvider>,
+    );
+
+    expect(await screen.findByText("Your recent repositories:")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "acme/shop" }));
+
+    expect(await screen.findByRole("heading", { name: /Ask about acme\/shop/ })).toBeInTheDocument();
+  });
+
+  it("shows no history to someone who is signed out", async () => {
+    renderAsk();
+    await screen.findByRole("heading", { name: "Ask about a repository" });
+    expect(screen.queryByText("Your recent repositories:")).not.toBeInTheDocument();
+  });
+
   it("opens straight into the chat from a shared link", () => {
     renderAsk("/ask?repo=golang/go");
     expect(screen.getByRole("heading", { name: /Ask about golang\/go/ })).toBeInTheDocument();

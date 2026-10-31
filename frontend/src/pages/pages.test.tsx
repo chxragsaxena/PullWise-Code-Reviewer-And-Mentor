@@ -49,6 +49,25 @@ describe("Home page", () => {
   });
 });
 
+describe("Home page suggestions", () => {
+  it("offers a signed-in user's earlier repositories and fills in the start of the link", async () => {
+    const client = fastClient();
+    await client.login();
+    renderApp(client);
+
+    const chip = await screen.findByRole("button", { name: "golang/example" });
+    await userEvent.click(chip);
+
+    expect(screen.getByLabelText("GitHub pull request link")).toHaveValue("https://github.com/golang/example/pull/");
+  });
+
+  it("offers nothing to someone signed out", async () => {
+    renderApp(fastClient());
+    await screen.findByText("acme/orders-service");
+    expect(screen.queryByText("Your repositories:")).not.toBeInTheDocument();
+  });
+});
+
 describe("Home page examples", () => {
   it("starts a review of a real pull request with one click, no link needed", async () => {
     renderApp(fastClient());

@@ -34,6 +34,9 @@ type API struct {
 	// rules is nil unless the user-standards endpoints are enabled.
 	rules RuleService
 
+	// repos is nil unless suggestions of a user's earlier repositories are enabled.
+	repos RepoHistory
+
 	// ask is nil unless repository questions are enabled; askLimit throttles them per client.
 	ask      AskService
 	askLimit *limiter
@@ -98,6 +101,9 @@ func (a *API) Handler() http.Handler {
 
 	if a.ask != nil {
 		mux.Handle("/api/ask", methods{http.MethodPost: a.askQuestion})
+	}
+	if a.repos != nil {
+		mux.Handle("/api/repos/recent", methods{http.MethodGet: a.listRecentRepos})
 	}
 	if a.rules != nil {
 		mux.Handle("/api/rules", methods{http.MethodGet: a.listRules, http.MethodPost: a.createRule})
