@@ -175,6 +175,23 @@ misses. Keyword search alone made things slightly worse; it helped only with the
 Questions about code are still missed sometimes (for example, "How are GitHub OAuth tokens
 encrypted?" never returned `crypto.go`).
 
+### Review quality: noise and what the AI adds
+
+I ran 12 real merged pull requests (Go: gin; TypeScript: zod, tRPC; Python: flask, httpx) through the deployed
+backend. 11 reviews completed, taking 6 to 87 seconds (median 43 s); the 12th request failed with a dropped
+connection before the review was created. The analyzers read whole files, so they flagged old code the pull
+request never touched: 770 findings across the 11 reviews, 303 on a single gin PR. Reviews now keep only
+findings on changed lines (a finding on a function the PR edited counts), and say how many they left out. Replaying
+the same 770 findings through the new step leaves **14**.
+
+I then read those 14 against the code:
+- **9 deterministic findings** (2 complexity of getValue, 1 of 	emplateSources, 6 explicit ny): all factually
+  correct. 5 are in production code; 4 are ny in a test file, which is correct but low value.
+- **5 AI findings**: none I would call a real defect. Four are generic design advice (single responsibility, open/closed)
+  that I would call debatable, and one is wrong: it called the HTTP QUERY method non-standard (it is a real, standardised
+  method) with 0.95 confidence. So on this sample the AI pass adds little, and its confidence number is not reliable.
+
+Twelve pull requests is a small sample and I did the labelling myself, so treat these as indications, not rates.
 Known limits: AI findings are less reliable than the parser-based ones (they carry the
-model's own confidence); only Go, TypeScript and Python have exact checks, and every analyzer reads the whole changed file, not just the changed lines; sharing a private
+model's own confidence); only Go, TypeScript and Python have exact checks; sharing a private
 review with another person is not built.

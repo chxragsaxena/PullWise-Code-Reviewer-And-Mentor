@@ -123,6 +123,8 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 		}
 		raw = append(raw, found...)
 	}
+	// Analyzers read whole files; only findings on code this pull request changed are worth reporting.
+	raw, outOfScope := scopeToChanges(raw, inputs)
 	findings := s.normalize(raw, selected)
 
 	if s.aiProvider != nil && hasAICheck(selected) {
@@ -130,7 +132,8 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 			return nil, "", err
 		}
 		related := s.relatedCode(ctx, id, ref, pr, inputs)
-		aiRaw := s.runAI(ctx, selected, inputs, related)
+		aiRaw, hidden := scopeToChanges(s.runAI(ctx, selected, inputs, related), inputs)
+		outOfScope += hidden
 		findings = append(findings, s.normalizeAI(aiRaw, selected)...)
 	}
 	sortFindings(findings)
@@ -138,6 +141,9 @@ func (s *Service) execute(ctx context.Context, id string, ref github.PullRequest
 	closing := "Review complete"
 	if skipped > 0 {
 		closing = fmt.Sprintf("Review complete. Analyzed %d of %d source files; the rest were skipped", len(analyzed), len(reviewable))
+	}
+	if outOfScope > 0 {
+		closing += fmt.Sprintf(". Left out %d %s in code this pull request did not change", outOfScope, plural(outOfScope, "finding", "findings"))
 	}
 	return findings, closing, nil
 }
