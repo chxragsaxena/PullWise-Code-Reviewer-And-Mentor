@@ -49,6 +49,17 @@ describe("Home page", () => {
   });
 });
 
+describe("Home page examples", () => {
+  it("starts a review of a real pull request with one click, no link needed", async () => {
+    renderApp(fastClient());
+
+    await userEvent.click(await screen.findByRole("button", { name: /Go · gin #4852/ }));
+
+    expect(await screen.findByRole("heading", { name: "Reviewing your pull request" })).toBeInTheDocument();
+    expect(await screen.findByText(/^Showing \d+ of \d+ findings?$/, {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});
+
 describe("Review page", () => {
   it("shows a clear failure state", async () => {
     const client = fastClient();

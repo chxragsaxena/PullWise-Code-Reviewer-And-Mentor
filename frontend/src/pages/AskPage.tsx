@@ -1,8 +1,14 @@
 import { useId, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChatPanel } from "../components/ChatPanel";
+import { TryExamples, type Example } from "../components/TryExamples";
 import { parseRepoRef, repoName } from "../lib/repoRef";
 import "./AskPage.css";
+
+const EXAMPLE_REPOS: Example[] = [
+  { id: "chxragsaxena/pullwise-knowledge", title: "pullwise-knowledge", detail: "Small Go service, ready in seconds" },
+  { id: "go-chi/chi", title: "go-chi/chi", detail: "Go HTTP router, first answer takes about a minute" },
+];
 
 const SUGGESTIONS = [
   "What does this repository do?",
@@ -78,6 +84,11 @@ export function AskPage() {
           </p>
         )}
       </form>
+      <TryExamples
+        heading="Not sure which repository? Try one:"
+        examples={EXAMPLE_REPOS}
+        onPick={(repo) => setParams({ repo })}
+      />
       <p className="ask__hint">Private repository? Sign in with GitHub first, and only you will be able to ask about it.</p>
     </section>
   );

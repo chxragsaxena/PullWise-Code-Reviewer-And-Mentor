@@ -42,6 +42,14 @@ describe("Ask page", () => {
     expect(screen.getByRole("button", { name: "What does this repository do?" })).toBeInTheDocument();
   });
 
+  it("opens a chat from an example repository with one click", async () => {
+    renderAsk();
+    await userEvent.click(screen.getByRole("button", { name: /pullwise-knowledge/ }));
+
+    expect(await screen.findByRole("heading", { name: /Ask about chxragsaxena\/pullwise-knowledge/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Your question")).toBeInTheDocument();
+  });
+
   it("opens straight into the chat from a shared link", () => {
     renderAsk("/ask?repo=golang/go");
     expect(screen.getByRole("heading", { name: /Ask about golang\/go/ })).toBeInTheDocument();
